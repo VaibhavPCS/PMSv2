@@ -3,6 +3,7 @@ const Cors            = require('cors');
 const Helmet          = require('helmet');
 const RateLimit       = require('express-rate-limit');
 const SuperTokens     = require('supertokens-node');
+const { middleware, errorHandler } = require('supertokens-node/framework/express');
 
 const { InitAuth } = require('@pms/auth-middleware');
 const { ErrorHandler, NotFoundHandler } = require('@pms/error-handler');
@@ -66,7 +67,7 @@ App.use(Cors({
   allowedHeaders: ['content-type', ...SuperTokens.getAllCORSHeaders()],
 }));
 App.use(Express.json());
-App.use(SuperTokens.middleware());
+App.use(middleware());
 
 const AuthLimiter = RateLimit({
   windowMs: 15 * 60 * 1000,
@@ -76,7 +77,24 @@ const AuthLimiter = RateLimit({
 
 App.use('/api/v1/auth', AuthLimiter, AuthRoutes);
 
-App.use(SuperTokens.errorHandler());
+if (process.env.NODE_ENV !== 'production') {
+  const SwaggerUi   = require('swagger-ui-express');
+  const SwaggerSpec = require('./config/swagger');
+
+  App.use(
+    '/api/v1/auth/docs',
+    (_req, res, next) => {
+      res.setHeader('Content-Security-Policy', '');
+      next();
+    },
+    SwaggerUi.serve,
+    SwaggerUi.setup(SwaggerSpec, {
+      customSiteTitle: 'PMS — Auth Service API',
+    }),
+  );
+}
+
+App.use(errorHandler());
 App.use(NotFoundHandler);
 App.use(ErrorHandler);
 

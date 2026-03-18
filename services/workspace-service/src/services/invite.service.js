@@ -1,10 +1,18 @@
-const Nodemailer   = require('nodemailer');
-const prisma       = require('../config/prisma');
-const { APIError } = require('@pms/error-handler');
+const Nodemailer        = require('nodemailer');
+const prisma            = require('../config/prisma');
+const { APIError }      = require('@pms/error-handler');
 const { ROLES, DAY_MS } = require('@pms/constants');
 const { PublishMemberAdded } = require('../events/publishers');
 
-// ─── Lazy Nodemailer transporter ──────────────────────────────────────────────
+const _requireAdminOrOwner = async (workspaceId, requesterId) => {
+  const member = await prisma.workspaceMember.findFirst({
+    where: { workspaceId, userId: requesterId, isActive: true },
+  });
+  if (!member) throw new APIError(404, 'Workspace not found.');
+  if (member.role !== ROLES.OWNER && member.role !== ROLES.ADMIN) {
+    throw new APIError(403, 'Only owners and admins can manage invites.');
+  }
+};
 
 let _transporter = null;
 
@@ -19,15 +27,13 @@ const _getTransporter = () => {
   return _transporter;
 };
 
-// ─── Service Functions ────────────────────────────────────────────────────────
+const CreateInvite = async (workspaceId, email, role, requesterId) => {
+  await _requireAdminOrOwner(workspaceId, requesterId);
 
-const CreateInvite = async (workspaceId, email, role) => {
-  // Only non-owner roles can be invited; ownership is transferred, not invited
   if (role === ROLES.OWNER) {
     throw new APIError(400, 'Cannot invite someone as owner. Use transfer ownership.');
   }
 
-  // Block duplicate active invite
   const existing = await prisma.workspaceInvite.findFirst({
     where: { workspaceId, email, acceptedAt: null, expiresAt: { gt: new Date() } },
   });
@@ -56,7 +62,7 @@ const CreateInvite = async (workspaceId, email, role) => {
 
 const ValidateInvite = async (token) => {
   const invite = await prisma.workspaceInvite.findUnique({ where: { token } });
-  if (!invite)          throw new APIError(404, 'Invite not found.');
+  if (!invite)           throw new APIError(404, 'Invite not found.');
   if (invite.acceptedAt) throw new APIError(410, 'Invite has already been used.');
   if (invite.expiresAt < new Date()) throw new APIError(410, 'Invite has expired.');
   return invite;
@@ -66,7 +72,6 @@ const AcceptInvite = async (token, userId) => {
   const invite = await ValidateInvite(token);
 
   await prisma.$transaction(async (tx) => {
-    // Upsert handles the case where user was previously removed (isActive: false)
     await tx.workspaceMember.upsert({
       where:  { workspaceId_userId: { workspaceId: invite.workspaceId, userId } },
       update: { isActive: true, role: invite.role },
@@ -81,7 +86,9 @@ const AcceptInvite = async (token, userId) => {
   await PublishMemberAdded(invite.workspaceId, userId, invite.role);
 };
 
-const RevokeInvite = async (workspaceId, email) => {
+const RevokeInvite = async (workspaceId, email, requesterId) => {
+  await _requireAdminOrOwner(workspaceId, requesterId);
+
   const invite = await prisma.workspaceInvite.findFirst({
     where: { workspaceId, email, acceptedAt: null },
   });

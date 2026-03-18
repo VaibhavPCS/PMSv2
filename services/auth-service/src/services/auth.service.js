@@ -1,10 +1,11 @@
-const prisma        = require('../config/prisma');
-const { APIError }  = require('@pms/error-handler');
+const prisma = require('../config/prisma');
+const { APIError } = require('@pms/error-handler');
+const { PublishUserRegistered, PublishUserUpdated } = require('../events/publishers');
 
 const CreateUser = async (id, name, email) => {
-  return prisma.user.create({
-    data: { id, name, email },
-  });
+  const user = await prisma.user.create({ data: { id, name, email } });
+  await PublishUserRegistered(id, name, email);
+  return user;
 };
 
 const GetUserById = async (id) => {
@@ -15,23 +16,25 @@ const GetUserById = async (id) => {
 
 const UpdateUser = async (id, { name, profilePicture } = {}) => {
   const data = {};
-  if (name           !== undefined) data.name           = name;
+  if (name !== undefined) data.name = name;
   if (profilePicture !== undefined) data.profilePicture = profilePicture;
 
-  return prisma.user.update({ where: { id }, data });
+  const user = await prisma.user.update({ where: { id }, data });
+  await PublishUserUpdated(id, data);
+  return user;
 };
 
 const SetLastLogin = async (id) => {
   return prisma.user.update({
     where: { id },
-    data:  { lastLogin: new Date() },
+    data: { lastLogin: new Date() },
   });
 };
 
 const SetActiveWorkspace = async (id, workspaceId) => {
   return prisma.user.update({
     where: { id },
-    data:  { activeWorkspace: workspaceId },
+    data: { activeWorkspace: workspaceId },
   });
 };
 

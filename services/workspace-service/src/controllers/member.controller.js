@@ -2,8 +2,6 @@ const { CatchAsync }   = require('@pms/error-handler');
 const MemberService    = require('../services/member.service');
 const InviteService    = require('../services/invite.service');
 
-// ─── Members ──────────────────────────────────────────────────────────────────
-
 const GetMembers = CatchAsync(async (req, res) => {
   const requesterId = req.session.getUserId();
   const members     = await MemberService.GetMembers(req.params.id, requesterId);
@@ -27,11 +25,10 @@ const ChangeMemberRole = CatchAsync(async (req, res) => {
   res.status(200).json({ status: 'success', data: member });
 });
 
-// ─── Invites ──────────────────────────────────────────────────────────────────
-
 const InviteMember = CatchAsync(async (req, res) => {
+  const requesterId     = req.session.getUserId();
   const { email, role } = req.body;
-  const invite          = await InviteService.CreateInvite(req.params.id, email, role);
+  const invite          = await InviteService.CreateInvite(req.params.id, email, role, requesterId);
   res.status(201).json({ status: 'success', data: { id: invite.id, email, role, expiresAt: invite.expiresAt } });
 });
 
@@ -42,8 +39,9 @@ const AcceptInvite = CatchAsync(async (req, res) => {
 });
 
 const RevokeInvite = CatchAsync(async (req, res) => {
-  const { email } = req.body;
-  await InviteService.RevokeInvite(req.params.id, email);
+  const requesterId = req.session.getUserId();
+  const { email }   = req.body;
+  await InviteService.RevokeInvite(req.params.id, email, requesterId);
   res.status(204).send();
 });
 
