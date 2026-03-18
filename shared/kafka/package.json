@@ -1,0 +1,10 @@
+{
+  "name": "@pms/kafka",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "private": true,
+  "dependencies": {
+    "@pms/constants": "*",
+    "kafkajs":        "^2.2.4"
+  }
+}

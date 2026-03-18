@@ -1,0 +1,22 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String    @id            // SuperTokens userId — no separate UUID
+  name            String
+  email           String    @unique
+  profilePicture  String?
+  activeWorkspace String?                  // last-open workspace (UI state only)
+  lastLogin       DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("users")
+}

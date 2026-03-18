@@ -1,0 +1,10 @@
+{
+  "name": "@pms/auth-middleware",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "private": true,
+  "dependencies": {
+    "nodemailer": "8.0.2",
+    "supertokens-node": "^9.2.3"
+  }
+}

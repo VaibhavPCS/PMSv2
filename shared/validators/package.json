@@ -1,0 +1,10 @@
+{
+  "name": "@pms/validators",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "private": true,
+  "dependencies": {
+    "@pms/constants": "*",
+    "zod":            "^4.3.6"
+  }
+}
