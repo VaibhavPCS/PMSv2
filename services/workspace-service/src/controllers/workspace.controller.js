@@ -1,8 +1,6 @@
 const { CatchAsync }      = require('@pms/error-handler');
 const WorkspaceService    = require('../services/workspace.service');
 
-// ─── Workspace CRUD ───────────────────────────────────────────────────────────
-
 const CreateWorkspace = CatchAsync(async (req, res) => {
   const userId    = req.session.getUserId();
   const workspace = await WorkspaceService.CreateWorkspace(userId, req.body);

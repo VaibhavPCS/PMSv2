@@ -1,0 +1,44 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Project {
+  id            String   @id @default(uuid())
+  workspaceId   String                           
+  name          String
+  description   String?
+  state         String   @default("Planning")   
+  projectStatus String   @default("on_track")    
+  startDate     DateTime
+  dueDate       DateTime?
+  tags          String[]
+  createdBy     String                           
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  members       ProjectMember[]
+
+  @@index([workspaceId])
+  @@index([createdBy])
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  projectId String
+  userId    String
+  role      String   @default("member") 
+  isActive  Boolean  @default(true)
+  joinedAt  DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
+}
