@@ -1,6 +1,7 @@
 const prisma                                      = require('../config/prisma');
 const { APIError }                                = require('@pms/error-handler');
 const { ROLES }                                   = require('@pms/constants');
+const { parsePagination }                         = require('@pms/validators');
 const { PublishWorkspaceCreated,
         PublishWorkspaceDeleted }                 = require('../events/publishers');
 
@@ -29,11 +30,23 @@ const CreateWorkspace = async (userId, { name, description, color }) => {
   return workspace;
 };
 
-const GetMyWorkspaces = async (userId) => {
-  return prisma.workspace.findMany({
-    where:   { members: { some: { userId, isActive: true } } },
-    include: { members: { where: { userId }, select: { role: true } } },
-  });
+const GetMyWorkspaces = async (userId, { page, limit } = {}) => {
+  const { safePage, safeLimit } = parsePagination({ page, limit });
+
+  const where = { members: { some: { userId, isActive: true } } };
+
+  const [workspaces, total] = await Promise.all([
+    prisma.workspace.findMany({
+      where,
+      include: { members: { where: { userId }, select: { role: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+    }),
+    prisma.workspace.count({ where }),
+  ]);
+
+  return { data: workspaces, total, page: safePage, limit: safeLimit };
 };
 
 const GetWorkspaceById = async (workspaceId, userId) => {

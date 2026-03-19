@@ -9,7 +9,8 @@ const CreateWorkspace = CatchAsync(async (req, res) => {
 
 const GetMyWorkspaces = CatchAsync(async (req, res) => {
   const userId     = req.session.getUserId();
-  const workspaces = await WorkspaceService.GetMyWorkspaces(userId);
+  const { page, limit } = req.query;
+  const workspaces = await WorkspaceService.GetMyWorkspaces(userId, { page, limit });
   res.status(200).json({ status: 'success', data: workspaces });
 });
 

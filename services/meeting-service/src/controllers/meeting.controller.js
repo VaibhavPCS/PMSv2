@@ -8,13 +8,15 @@ const CreateMeeting = CatchAsync(async (req, res) => {
 });
 
 const GetMeetings = CatchAsync(async (req, res) => {
-    const { workspaceId, from, to } = req.query;
-    const meetings = await MeetingService.GetMeetings(workspaceId, from, to);
+    const userId = req.session.getUserId();
+    const { workspaceId, from, to, page, limit } = req.query;
+    const meetings = await MeetingService.GetMeetings(workspaceId, userId, from, to, { page, limit });
     res.status(200).json({ status: 'success', data: meetings });
 });
 
 const GetMeetingById = CatchAsync(async (req, res) => {
-    const meeting = await MeetingService.GetMeetingById(req.params.id);
+    const userId = req.session.getUserId();
+    const meeting = await MeetingService.GetMeetingById(req.params.id, userId);
     res.status(200).json({ status: 'success', data: meeting });
 });
 

@@ -1,7 +1,7 @@
 const Router = require('express').Router();
 const { z } = require('zod');
 const { AuthenticateToken } = require('@pms/auth-middleware');
-const { ValidateRequest, CreateProjectSchema, UpdateProjectSchema, AddProjectMemberSchema, ChangeProjectHeadSchema, ExtendProjectDeadlineSchema } = require('@pms/validators');
+const { ValidateRequest, ValidateQuery, GetProjectsQuerySchema, CreateProjectSchema, UpdateProjectSchema, AddProjectMemberSchema, ChangeProjectHeadSchema, ExtendProjectDeadlineSchema } = require('@pms/validators');
 const { CreateProject, GetProjects, GetProject, UpdateProject, DeleteProject, ExtendProjectDeadline } = require('../controllers/project.controller');
 const { GetMembers, AddMember, RemoveMember, ChangeMemberRole, ChangeProjectHead } = require('../controllers/member.controller');
 
@@ -10,7 +10,7 @@ const ChangeRoleBodySchema = z.object({
 }).strict();
 
 Router.post('/', AuthenticateToken, ValidateRequest(CreateProjectSchema), CreateProject);
-Router.get('/', AuthenticateToken, GetProjects);
+Router.get('/', AuthenticateToken, ValidateQuery(GetProjectsQuerySchema), GetProjects);
 Router.get('/:id', AuthenticateToken, GetProject);
 Router.patch('/:id', AuthenticateToken, ValidateRequest(UpdateProjectSchema), UpdateProject);
 Router.delete('/:id', AuthenticateToken, DeleteProject);

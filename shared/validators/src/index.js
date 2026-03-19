@@ -220,6 +220,40 @@ const ExtendProjectDeadlineSchema = z.object({
   reason:     z.string().min(10, 'A reason of at least 10 characters is required'),
 });
 
+// ─── Pagination helper ────────────────────────────────────────────────────────
+
+const PaginationSchema = z.object({
+  page:  z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
+// ─── Query schemas ────────────────────────────────────────────────────────────
+
+const GetTasksQuerySchema = PaginationSchema.extend({
+  projectId: UUIDSchema.optional(),
+  sprintId:  UUIDSchema.optional(),
+  status:    z.enum(Object.values(TASK_STATUS)).optional(),
+});
+
+const GetSprintsQuerySchema = z.object({
+  projectId: UUIDSchema,
+});
+
+const GetProjectsQuerySchema = PaginationSchema.extend({
+  workspaceId: UUIDSchema,
+});
+
+const GetMeetingsQuerySchema = PaginationSchema.extend({
+  workspaceId: UUIDSchema,
+  // from and to are required — callers must always specify a time window to
+  // prevent unbounded meeting scans across the full workspace history.
+  from:        z.string().datetime({ message: 'from must be a valid ISO datetime' }),
+  to:          z.string().datetime({ message: 'to must be a valid ISO datetime' }),
+}).refine((obj) => new Date(obj.to) >= new Date(obj.from), {
+  message: 'to must be on or after from',
+  path: ['to'],
+});
+
 const ValidateRequest = (schema) => {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
@@ -237,8 +271,44 @@ const ValidateRequest = (schema) => {
   };
 };
 
+const ValidateQuery = (schema) => {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const errors = result.error.issues.map(
+        (e) => `${e.path.join('.')}: ${e.message}`
+      );
+      return res.status(422).json({
+        status: 'fail',
+        message: `Validation failed. ${errors.join('. ')}`,
+      });
+    }
+    req.query = result.data;
+    next();
+  };
+};
+
+/**
+ * Parses and sanitises page/limit values from a query object.
+ * Centralises pagination logic so each service doesn't have to repeat it.
+ *
+ * @param {{ page?: number|string, limit?: number|string }} query
+ * @returns {{ safePage: number, safeLimit: number }}
+ */
+const parsePagination = ({ page = 1, limit = 20 } = {}) => ({
+  safePage:  Math.max(1, Number(page)),
+  safeLimit: Math.min(100, Math.max(1, Number(limit))),
+});
+
 module.exports = {
   ValidateRequest,
+  ValidateQuery,
+  parsePagination,
+  PaginationSchema,
+  GetTasksQuerySchema,
+  GetSprintsQuerySchema,
+  GetProjectsQuerySchema,
+  GetMeetingsQuerySchema,
   RegisterSchema,
   LoginSchema,
   VerifyEmailSchema,

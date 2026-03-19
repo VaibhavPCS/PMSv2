@@ -9,7 +9,8 @@ const CreateProject = CatchAsync(async (req, res) => {
 
 const GetProjects = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
-    const projects = await ProjectService.GetProjects(req.query.workspaceId, userId);
+    const { workspaceId, page, limit } = req.query;
+    const projects = await ProjectService.GetProjects(workspaceId, userId, { page, limit });
     res.status(200).json(projects);
 });
 

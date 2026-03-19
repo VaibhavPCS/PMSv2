@@ -106,10 +106,13 @@ const GetSprints = async (projectId) => {
 
 const GetSprintById = async (sprintId) => {
   const sprint = await _fetchSprint(sprintId);
+  // Cap at 100 tasks: sprints with hundreds of tasks would return unbounded
+  // results. Use the paginated GetTasks endpoint for full task retrieval.
   const tasks = await prisma.task.findMany({
     where: { sprintId, isActive: true },
     include: { assignees: true },
     orderBy: { createdAt: 'desc' },
+    take: 100,
   });
   return { ...sprint, tasks };
 };

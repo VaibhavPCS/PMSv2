@@ -1,17 +1,22 @@
 // ─── Phase 1 — MemberService Tests ───────────────────────────────────────────
 
-jest.mock('../../config/prisma', () => ({
-  workspaceMember: {
-    findFirst: jest.fn(),
-    findMany:  jest.fn(),
-    upsert:    jest.fn(),
-    update:    jest.fn(),
-  },
-}));
+jest.mock('../../config/prisma', () => {
+  const mock = {
+    workspaceMember: {
+      findFirst: jest.fn(),
+      findMany:  jest.fn(),
+      upsert:    jest.fn(),
+      update:    jest.fn(),
+    },
+  };
+  mock.$transaction = jest.fn().mockImplementation(async (fn) => fn(mock));
+  return mock;
+});
 
 jest.mock('../../events/publishers', () => ({
-  PublishMemberAdded:   jest.fn().mockResolvedValue(undefined),
-  PublishMemberRemoved: jest.fn().mockResolvedValue(undefined),
+  PublishMemberAdded:       jest.fn().mockResolvedValue(undefined),
+  PublishMemberRemoved:     jest.fn().mockResolvedValue(undefined),
+  PublishMemberRoleChanged: jest.fn().mockResolvedValue(undefined),
 }));
 
 const prisma         = require('../../config/prisma');

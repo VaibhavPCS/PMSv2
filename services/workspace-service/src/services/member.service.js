@@ -38,36 +38,58 @@ const AddMember = async (workspaceId, userId, role) => {
 };
 
 const RemoveMember = async (workspaceId, targetUserId, requesterId) => {
-  const target = await _getActiveMember(workspaceId, targetUserId);
-  if (!target) throw new APIError(404, 'Member not found.');
-  if (target.role === ROLES.OWNER) throw new APIError(403, 'Cannot remove the workspace owner.');
-  if (requesterId !== targetUserId) {
-    await _requireAdminOrOwner(workspaceId, requesterId);
-  }
+  await prisma.$transaction(async (tx) => {
+    const target = await tx.workspaceMember.findFirst({
+      where: { workspaceId, userId: targetUserId, isActive: true },
+    });
+    if (!target) throw new APIError(404, 'Member not found.');
+    if (target.role === ROLES.OWNER) throw new APIError(403, 'Cannot remove the workspace owner.');
+    if (requesterId !== targetUserId) {
+      const requester = await tx.workspaceMember.findFirst({
+        where: { workspaceId, userId: requesterId, isActive: true },
+      });
+      if (!requester) throw new APIError(404, 'Workspace not found.');
+      if (requester.role !== ROLES.OWNER && requester.role !== ROLES.ADMIN) {
+        throw new APIError(403, 'Only owners and admins can perform this action.');
+      }
+    }
 
-  await prisma.workspaceMember.update({
-    where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
-    data: { isActive: false },
+    await tx.workspaceMember.update({
+      where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
+      data: { isActive: false },
+    });
   });
+
   await PublishMemberRemoved(workspaceId, targetUserId);
 };
 
 const ChangeMemberRole = async (workspaceId, targetUserId, newRole, requesterId) => {
-  await _requireAdminOrOwner(workspaceId, requesterId);
+  const updated = await prisma.$transaction(async (tx) => {
+    const requester = await tx.workspaceMember.findFirst({
+      where: { workspaceId, userId: requesterId, isActive: true },
+    });
+    if (!requester) throw new APIError(404, 'Workspace not found.');
+    if (requester.role !== ROLES.OWNER && requester.role !== ROLES.ADMIN) {
+      throw new APIError(403, 'Only owners and admins can perform this action.');
+    }
 
-  const target = await _getActiveMember(workspaceId, targetUserId);
-  if (!target) throw new APIError(404, 'Member not found.');
-  if (target.role === ROLES.OWNER) {
-    throw new APIError(403, 'Cannot change the owner\'s role. Use transfer ownership.');
-  }
-  if (newRole === ROLES.OWNER) {
-    throw new APIError(400, 'Cannot assign owner role directly. Use transfer ownership.');
-  }
+    const target = await tx.workspaceMember.findFirst({
+      where: { workspaceId, userId: targetUserId, isActive: true },
+    });
+    if (!target) throw new APIError(404, 'Member not found.');
+    if (target.role === ROLES.OWNER) {
+      throw new APIError(403, 'Cannot change the owner\'s role. Use transfer ownership.');
+    }
+    if (newRole === ROLES.OWNER) {
+      throw new APIError(400, 'Cannot assign owner role directly. Use transfer ownership.');
+    }
 
-  const updated = await prisma.workspaceMember.update({
-    where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
-    data: { role: newRole },
+    return tx.workspaceMember.update({
+      where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
+      data: { role: newRole },
+    });
   });
+
   await PublishMemberRoleChanged(workspaceId, targetUserId, newRole);
   return updated;
 };

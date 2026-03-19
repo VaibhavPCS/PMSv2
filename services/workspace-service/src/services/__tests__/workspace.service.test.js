@@ -8,6 +8,7 @@ jest.mock('../../config/prisma', () => {
       findUnique: jest.fn(),
       update:     jest.fn(),
       delete:     jest.fn(),
+      count:      jest.fn(),
     },
     workspaceMember: {
       findFirst: jest.fn(),
@@ -78,6 +79,7 @@ describe('WorkspaceService.CreateWorkspace', () => {
 describe('WorkspaceService.GetMyWorkspaces', () => {
   it('queries workspaces where the user is an active member', async () => {
     prisma.workspace.findMany.mockResolvedValue([MOCK_WS]);
+    prisma.workspace.count.mockResolvedValue(1);
 
     const result = await WorkspaceService.GetMyWorkspaces('user-1');
 
@@ -86,7 +88,7 @@ describe('WorkspaceService.GetMyWorkspaces', () => {
         where: expect.objectContaining({ members: { some: { userId: 'user-1', isActive: true } } }),
       })
     );
-    expect(result).toEqual([MOCK_WS]);
+    expect(result).toMatchObject({ data: [MOCK_WS], total: 1, page: 1, limit: 20 });
   });
 });
 

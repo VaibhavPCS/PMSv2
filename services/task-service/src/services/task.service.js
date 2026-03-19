@@ -2,6 +2,7 @@ const prisma = require('../config/prisma');
 const { APIError } = require('@pms/error-handler');
 const { TASK_STATUS } = require('@pms/constants');
 const { CreateLogger } = require('@pms/logger');
+const { parsePagination } = require('@pms/validators');
 const {
   PublishTaskCreated,
   PublishTaskStatusChanged,
@@ -99,8 +100,10 @@ const CreateTask = async (userId, {
     throw new APIError(400, 'Invalid due date');
   }
 
-  return prisma.$transaction(async (tx) => {
-    const task = await tx.task.create({
+  // Publish OUTSIDE the transaction so a Kafka failure cannot roll back the
+  // committed task, and a transaction rollback cannot leak a spurious event.
+  const task = await prisma.$transaction(async (tx) => {
+    const created = await tx.task.create({
       data: {
         title, description, priority,
         dueDate: parsedDueDate,
@@ -114,16 +117,18 @@ const CreateTask = async (userId, {
     });
 
     for (const assigneeId of assignees) {
-      await tx.taskAssignee.create({ data: { taskId: task.id, userId: assigneeId } });
+      await tx.taskAssignee.create({ data: { taskId: created.id, userId: assigneeId } });
     }
 
     await tx.taskHistory.create({
-      data: { taskId: task.id, userId, action: 'created', toValue: TASK_STATUS.PENDING },
+      data: { taskId: created.id, userId, action: 'created', toValue: TASK_STATUS.PENDING },
     });
 
-    await PublishTaskCreated(task.id, projectId, workspaceId, assignees);
-    return task;
+    return created;
   });
+
+  await PublishTaskCreated(task.id, projectId, workspaceId, assignees);
+  return task;
 };
 
 const GetTasks = async (query, userId) => {
@@ -136,17 +141,32 @@ const GetTasks = async (query, userId) => {
   if (sprintId) where.sprintId = sprintId;
   if (status) where.status = status;
 
-  return prisma.task.findMany({
-    where,
-    include: { assignees: true },
-    orderBy: { createdAt: 'desc' },
-  });
+  const { safePage, safeLimit } = parsePagination(query);
+
+  const [tasks, total] = await Promise.all([
+    prisma.task.findMany({
+      where,
+      include: { assignees: true },
+      orderBy: { createdAt: 'desc' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+    }),
+    prisma.task.count({ where }),
+  ]);
+
+  return { data: tasks, total, page: safePage, limit: safeLimit };
 };
 
 const GetTaskById = async (taskId, userId) => {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    include: { assignees: true, history: { orderBy: { createdAt: 'asc' } } },
+    include: {
+      assignees: true,
+      // Cap history at 100 entries: full history is unbounded for long-lived tasks
+      // and loading thousands of rows per request is a major performance risk at scale.
+      // Older entries remain in the DB and can be retrieved via a dedicated history endpoint if needed.
+      history: { orderBy: { createdAt: 'asc' }, take: 100 },
+    },
   });
 
   if (!task || !task.isActive) throw new APIError(404, 'Task not found.');
