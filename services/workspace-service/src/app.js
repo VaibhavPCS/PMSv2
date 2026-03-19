@@ -29,14 +29,6 @@ App.use(Cors({
 App.use(Express.json());
 App.use(middleware());
 
-const ApiLimiter = RateLimit({
-  windowMs: 15 * 60 * 1000,
-  max:      100,
-  message:  { status: 'fail', message: 'Too many requests. Please slow down.' },
-});
-
-App.use('/api/v1/workspaces', ApiLimiter, WorkspaceRoutes);
-
 if (process.env.NODE_ENV !== 'production') {
   const SwaggerUi   = require('swagger-ui-express');
   const SwaggerSpec = require('./config/swagger');
@@ -51,6 +43,14 @@ if (process.env.NODE_ENV !== 'production') {
     SwaggerUi.setup(SwaggerSpec, { customSiteTitle: 'PMS — Workspace Service API' }),
   );
 }
+
+const ApiLimiter = RateLimit({
+  windowMs: 15 * 60 * 1000,
+  max:      100,
+  message:  { status: 'fail', message: 'Too many requests. Please slow down.' },
+});
+
+App.use('/api/v1/workspaces', ApiLimiter, WorkspaceRoutes);
 
 App.use(errorHandler());
 App.use(NotFoundHandler);

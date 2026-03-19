@@ -10,15 +10,15 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const TASK_STATUS = {
-    PENDING:     'pending',
+    PENDING: 'pending',
     IN_PROGRESS: 'in_progress',
-    COMPLETED:   'completed',    
-    IN_REVIEW:   'in_review',    
-    APPROVED:    'approved',     
-    REJECTED:    'rejected',     
-    ON_HOLD:     'on_hold',
-    OVERDUE:     'overdue',
-    FLAGGED:     'flagged',      
+    COMPLETED: 'completed',
+    IN_REVIEW: 'in_review',
+    APPROVED: 'approved',
+    REJECTED: 'rejected',
+    ON_HOLD: 'on_hold',
+    OVERDUE: 'overdue',
+    FLAGGED: 'flagged',
 }
 const PRIORITY_LEVELS = {
     LOW: "low",
@@ -34,12 +34,12 @@ const PROJECT_STATUS = {
     COMPLETED: 'completed',
 }
 const ROLES = {
-    OWNER:        'owner',
-    SUPER_ADMIN:  'super_admin',
-    ADMIN:        'admin',
+    OWNER: 'owner',
+    SUPER_ADMIN: 'super_admin',
+    ADMIN: 'admin',
     PROJECT_HEAD: 'project_head',
-    TEAM_LEAD:    'team_lead',
-    MEMBER:       'member',
+    TEAM_LEAD: 'team_lead',
+    MEMBER: 'member',
 }
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const MAX_FILES_PER_UPLOAD = 3;
@@ -74,13 +74,34 @@ const ANALYTICS_JOB_TYPES = {
     TASK_LIFECYCLE: 'UPDATE_TASK_LIFECYCLE',
 }
 
-const PROJECT_STATE = {                                                                                                                                           
-    PLANNING:    'Planning',                                                                                                                                      
-    IN_PROGRESS: 'In Progress',                                                                                                                                     
-    ON_HOLD:     'On Hold',
-    COMPLETED:   'Completed',                                                                                                                                       
-    CANCELLED:   'Cancelled',                                                                                                                                     
-  }
+const PROJECT_STATE = {
+    PLANNING: 'Planning',
+    IN_PROGRESS: 'In Progress',
+    ON_HOLD: 'On Hold',
+    COMPLETED: 'Completed',
+    CANCELLED: 'Cancelled',
+}
+
+const NOTIFICATION_TYPES = {
+  TASK_ASSIGNED:        'TASK_ASSIGNED',
+  TASK_STATUS_CHANGED:  'TASK_STATUS_CHANGED',
+  TASK_APPROVED:        'TASK_APPROVED',
+  TASK_REJECTED:        'TASK_REJECTED',
+  TASK_IN_REVIEW:       'TASK_IN_REVIEW',
+  TASK_OVERDUE:         'TASK_OVERDUE',
+  PROJECT_CREATED:          'PROJECT_CREATED',
+  PROJECT_DEADLINE_EXTENDED: 'PROJECT_DEADLINE_EXTENDED',
+  PROJECT_MEMBER_ADDED:     'PROJECT_MEMBER_ADDED',
+  PROJECT_MEMBER_REMOVED:   'PROJECT_MEMBER_REMOVED',
+  WORKSPACE_INVITED:        'WORKSPACE_INVITED',
+  WORKSPACE_MEMBER_REMOVED: 'WORKSPACE_MEMBER_REMOVED',
+  WORKSPACE_ROLE_CHANGED:   'WORKSPACE_ROLE_CHANGED',
+  SPRINT_CREATED:   'SPRINT_CREATED',
+  SPRINT_DELETED:   'SPRINT_DELETED',
+  WORKFLOW_STAGE_CHANGED:  'WORKFLOW_STAGE_CHANGED',
+  WORKFLOW_SLA_BREACHED:   'WORKFLOW_SLA_BREACHED',
+  WORKFLOW_ESCALATED:      'WORKFLOW_ESCALATED',
+};
 
 module.exports = {
     DAY_MS,
@@ -103,5 +124,6 @@ module.exports = {
     TOPICS,
     ANALYTICS_JOB_TYPES,
     PROJECT_STATE,
-    INVITE_EXPIRY_MS
+    INVITE_EXPIRY_MS,
+    NOTIFICATION_TYPES,
 };
