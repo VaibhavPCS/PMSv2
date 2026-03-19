@@ -1,10 +1,7 @@
-const prisma                               = require('../config/prisma');
-const { APIError }                         = require('@pms/error-handler');
-const { ROLES }                            = require('@pms/constants');
-const { PublishMemberAdded,
-        PublishMemberRemoved }             = require('../events/publishers');
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const prisma = require('../config/prisma');
+const { APIError } = require('@pms/error-handler');
+const { ROLES } = require('@pms/constants');
+const { PublishMemberAdded, PublishMemberRemoved, PublishMemberRoleChanged } = require('../events/publishers');
 
 const _getActiveMember = async (workspaceId, userId) => {
   return prisma.workspaceMember.findFirst({
@@ -21,8 +18,6 @@ const _requireAdminOrOwner = async (workspaceId, requesterId) => {
   return member;
 };
 
-// ─── Service Functions ────────────────────────────────────────────────────────
-
 const GetMembers = async (workspaceId, requesterId) => {
   const requester = await _getActiveMember(workspaceId, requesterId);
   if (!requester) throw new APIError(403, 'Access denied.');
@@ -34,7 +29,7 @@ const GetMembers = async (workspaceId, requesterId) => {
 
 const AddMember = async (workspaceId, userId, role) => {
   const member = await prisma.workspaceMember.upsert({
-    where:  { workspaceId_userId: { workspaceId, userId } },
+    where: { workspaceId_userId: { workspaceId, userId } },
     update: { isActive: true, role },
     create: { workspaceId, userId, role },
   });
@@ -46,15 +41,13 @@ const RemoveMember = async (workspaceId, targetUserId, requesterId) => {
   const target = await _getActiveMember(workspaceId, targetUserId);
   if (!target) throw new APIError(404, 'Member not found.');
   if (target.role === ROLES.OWNER) throw new APIError(403, 'Cannot remove the workspace owner.');
-
-  // Self-leave is always allowed; otherwise requester must be owner or admin
   if (requesterId !== targetUserId) {
     await _requireAdminOrOwner(workspaceId, requesterId);
   }
 
   await prisma.workspaceMember.update({
     where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
-    data:  { isActive: false },
+    data: { isActive: false },
   });
   await PublishMemberRemoved(workspaceId, targetUserId);
 };
@@ -71,10 +64,12 @@ const ChangeMemberRole = async (workspaceId, targetUserId, newRole, requesterId)
     throw new APIError(400, 'Cannot assign owner role directly. Use transfer ownership.');
   }
 
-  return prisma.workspaceMember.update({
+  const updated = await prisma.workspaceMember.update({
     where: { workspaceId_userId: { workspaceId, userId: targetUserId } },
-    data:  { role: newRole },
+    data: { role: newRole },
   });
+  await PublishMemberRoleChanged(workspaceId, targetUserId, newRole);
+  return updated;
 };
 
 module.exports = {

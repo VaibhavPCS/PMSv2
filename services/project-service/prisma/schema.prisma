@@ -9,20 +9,21 @@ generator client {
 
 model Project {
   id            String   @id @default(uuid())
-  workspaceId   String                           
+  workspaceId   String                           // plain UUID — never cross-query pms_workspace
   name          String
   description   String?
-  state         String   @default("Planning")   
-  projectStatus String   @default("on_track")    
+  state         String   @default("Planning")    // PROJECT_STATE values
+  projectStatus String   @default("on_track")    // PROJECT_STATUS values
   startDate     DateTime
-  dueDate       DateTime?
+  endDate       DateTime?                         // renamed from dueDate
   tags          String[]
-  createdBy     String                           
+  createdBy     String                           // userId
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   members       ProjectMember[]
+  dateHistory   ProjectDateHistory[]
 
   @@index([workspaceId])
   @@index([createdBy])
@@ -32,7 +33,7 @@ model ProjectMember {
   id        String   @id @default(uuid())
   projectId String
   userId    String
-  role      String   @default("member") 
+  role      String   @default("member")          // project_head | tl | trainee | member
   isActive  Boolean  @default(true)
   joinedAt  DateTime @default(now())
 
@@ -41,4 +42,34 @@ model ProjectMember {
   @@unique([projectId, userId])
   @@index([userId])
   @@index([projectId])
+}
+
+// Tracks every project end-date extension — shown in project overview
+model ProjectDateHistory {
+  id         String    @id @default(uuid())
+  projectId  String
+  oldEndDate DateTime?
+  newEndDate DateTime
+  reason     String                              // required — admin/owner must provide reason
+  extendedBy String                              // userId of workspace admin/owner
+  createdAt  DateTime  @default(now())
+
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// Local read model — populated via MEMBER_ADDED / MEMBER_ROLE_CHANGED workspace events.
+// Allows project-service to check workspace admin/owner without cross-DB queries.
+// Only elevated roles (admin, owner) are stored — regular members are absent.
+model WorkspaceRoleCache {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  role        String                              // owner | admin
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, workspaceId])
+  @@index([userId])
+  @@index([workspaceId])
 }

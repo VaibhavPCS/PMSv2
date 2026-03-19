@@ -1,5 +1,5 @@
 {
-  "name": "@pms/project-service",
+  "name": "@pms/task-service",
   "version": "1.0.0",
   "private": true,
   "main": "index.js",

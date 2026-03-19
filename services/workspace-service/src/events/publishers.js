@@ -1,8 +1,6 @@
 const { CreateProducer, PublishEvent } = require('@pms/kafka');
 const { TOPICS }                       = require('@pms/constants');
 
-// ─── Lazy singleton producer ──────────────────────────────────────────────────
-
 let _producer = null;
 
 const _getProducer = async () => {
@@ -11,8 +9,6 @@ const _getProducer = async () => {
   }
   return _producer;
 };
-
-// ─── Publishers ───────────────────────────────────────────────────────────────
 
 const PublishWorkspaceCreated = async (workspaceId, ownerId, name) => {
   const producer = await _getProducer();
@@ -55,9 +51,21 @@ const PublishMemberRemoved = async (workspaceId, userId) => {
   });
 };
 
+const PublishMemberRoleChanged = async (workspaceId, userId, newRole) => {
+  const producer = await _getProducer();
+  await PublishEvent(producer, TOPICS.WORKSPACE_EVENTS, workspaceId, {
+    type:        'MEMBER_ROLE_CHANGED',
+    workspaceId,
+    userId,
+    newRole,
+    timestamp:   new Date().toISOString(),
+  });
+};
+
 module.exports = {
   PublishWorkspaceCreated,
   PublishWorkspaceDeleted,
   PublishMemberAdded,
   PublishMemberRemoved,
+  PublishMemberRoleChanged,
 };

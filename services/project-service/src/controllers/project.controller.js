@@ -31,10 +31,17 @@ const DeleteProject = CatchAsync(async (req, res) => {
     res.status(204).send();
 });
 
+const ExtendProjectDeadline = CatchAsync(async (req, res) => {
+    const userId  = req.session.getUserId();
+    const project = await ProjectService.ExtendProjectDeadline(req.params.id, userId, req.body);
+    res.status(200).json({ status: 'success', data: project });
+});
+
 module.exports = {
     CreateProject,
     GetProjects,
     GetProject,
     UpdateProject,
-    DeleteProject
+    DeleteProject,
+    ExtendProjectDeadline,
 };

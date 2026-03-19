@@ -83,7 +83,7 @@ const CreateProjectSchema = z.object({
   description: z.string().optional(),
   state: z.enum(Object.values(PROJECT_STATE)).optional(),
   startDate: DateSchema,
-  dueDate: DateSchema.optional(),
+  endDate: DateSchema.optional(),
   tags: z.array(z.string()).optional(),
   members: z.array(
     z.object({
@@ -99,7 +99,7 @@ const UpdateProjectSchema = z.object({
   state: z.enum(Object.values(PROJECT_STATE)).optional(),
   projectStatus: z.enum(Object.values(PROJECT_STATUS)).optional(),
   startDate: DateSchema.optional(),
-  dueDate: DateSchema.optional(),
+  endDate: DateSchema.optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -113,30 +113,37 @@ const ChangeProjectHeadSchema = z.object({
 });
 
 const CreateTaskSchema = z.object({
-  title: z.string().min(1, 'Task title is required'),
-  description: z.string().optional(),
-  priority: z.enum(Object.values(PRIORITY_LEVELS)),
-  dueDate: DateSchema,
-  assignees: z.array(UUIDSchema).min(1, 'At least one assignee is required'),
-  projectId: UUIDSchema,
-  sprintId: UUIDSchema.optional(),
-  parentTask: UUIDSchema.optional(),
+  title:         z.string().min(1, 'Task title is required'),
+  description:   z.string().optional(),
+  priority:      z.enum(Object.values(PRIORITY_LEVELS)),
+  dueDate:       DateSchema,
+  assignees:     z.array(UUIDSchema).min(1, 'At least one assignee is required'),
+  projectId:     UUIDSchema,
+  workspaceId:   UUIDSchema,
+  projectHeadId: UUIDSchema,
+  sprintId:      UUIDSchema.optional(),
+  parentTask:    UUIDSchema.optional(),
 });
 
+// Only statuses a user can set themselves via UpdateStatus.
+// IN_REVIEW, APPROVED, REJECTED, FLAGGED, OVERDUE are set exclusively by service logic.
 const UpdateTaskStatusSchema = z.object({
-  status: z.enum(Object.values(TASK_STATUS)),
+  status: z.enum([
+    TASK_STATUS.PENDING,
+    TASK_STATUS.IN_PROGRESS,
+    TASK_STATUS.COMPLETED,
+    TASK_STATUS.ON_HOLD,
+  ]),
   reason: z.string().optional(),
 });
 
 const ApproveTaskSchema = z.object({
-  taskId: UUIDSchema,
   comment: z.string().optional(),
 });
 
 const RejectTaskSchema = z.object({
-  taskId: UUIDSchema,
-  reason: z.string().min(1, 'Rejection reason is required'),
-  reAssignTo: UUIDSchema.optional(),
+  reason:   z.string().min(1, 'Rejection reason is required'),
+  rejectTo: UUIDSchema, 
 });
 
 const HandoverSchema = z.object({
@@ -208,6 +215,11 @@ const EditMessageSchema = z.object({
   content: z.string().min(1, 'Message content is required'),
 });
 
+const ExtendProjectDeadlineSchema = z.object({
+  newEndDate: DateSchema,
+  reason:     z.string().min(10, 'A reason of at least 10 characters is required'),
+});
+
 const ValidateRequest = (schema) => {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
@@ -243,6 +255,7 @@ module.exports = {
   UpdateProjectSchema,
   AddProjectMemberSchema,
   ChangeProjectHeadSchema,
+  ExtendProjectDeadlineSchema,
   CreateTaskSchema,
   UpdateTaskStatusSchema,
   ApproveTaskSchema,

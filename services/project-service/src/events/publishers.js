@@ -83,6 +83,17 @@ const PublishProjectHeadChanged = async (projectId, oldHeadId, newHeadId) => {
   });
 };
 
+const PublishProjectDeadlineExtended = async (projectId, newEndDate, extendedBy) => {
+  const producer = await _getProducer();
+  await PublishEvent(producer, TOPICS.PROJECT_EVENTS, projectId, {
+    type:       'PROJECT_DEADLINE_EXTENDED',
+    projectId,
+    newEndDate,
+    extendedBy,
+    timestamp:  new Date().toISOString(),
+  });
+};
+
 module.exports = {
   PublishProjectCreated,
   PublishProjectUpdated,
@@ -91,4 +102,5 @@ module.exports = {
   PublishProjectMemberRemoved,
   PublishProjectMemberRoleChanged,
   PublishProjectHeadChanged,
+  PublishProjectDeadlineExtended,
 };

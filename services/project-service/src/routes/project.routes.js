@@ -1,8 +1,8 @@
 const Router = require('express').Router();
 const { z } = require('zod');
 const { AuthenticateToken } = require('@pms/auth-middleware');
-const { ValidateRequest, CreateProjectSchema, UpdateProjectSchema, AddProjectMemberSchema, ChangeProjectHeadSchema } = require('@pms/validators');
-const { CreateProject, GetProjects, GetProject, UpdateProject, DeleteProject } = require('../controllers/project.controller');
+const { ValidateRequest, CreateProjectSchema, UpdateProjectSchema, AddProjectMemberSchema, ChangeProjectHeadSchema, ExtendProjectDeadlineSchema } = require('@pms/validators');
+const { CreateProject, GetProjects, GetProject, UpdateProject, DeleteProject, ExtendProjectDeadline } = require('../controllers/project.controller');
 const { GetMembers, AddMember, RemoveMember, ChangeMemberRole, ChangeProjectHead } = require('../controllers/member.controller');
 
 const ChangeRoleBodySchema = z.object({
@@ -19,5 +19,6 @@ Router.post('/:id/members', AuthenticateToken, ValidateRequest(AddProjectMemberS
 Router.delete('/:id/members/:userId', AuthenticateToken, RemoveMember);
 Router.patch('/:id/members/:userId/role', AuthenticateToken, ValidateRequest(ChangeRoleBodySchema), ChangeMemberRole);
 Router.patch('/:id/project-head', AuthenticateToken, ValidateRequest(ChangeProjectHeadSchema), ChangeProjectHead);
+Router.patch('/:id/extend-deadline', AuthenticateToken, ValidateRequest(ExtendProjectDeadlineSchema), ExtendProjectDeadline);
 
 module.exports = Router;

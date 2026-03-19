@@ -10,14 +10,15 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const TASK_STATUS = {
-    PENDING: "pending",
-    IN_PROGRESS: "in_progress",
-    COMPLETED: "completed",
-    REJECTED: "rejected",
-    APPROVED: "approved",
-    ON_HOLD: "on_hold",
-    OVERDUE: "overdue",
-    HANDOVER: "handover",
+    PENDING:     'pending',
+    IN_PROGRESS: 'in_progress',
+    COMPLETED:   'completed',    
+    IN_REVIEW:   'in_review',    
+    APPROVED:    'approved',     
+    REJECTED:    'rejected',     
+    ON_HOLD:     'on_hold',
+    OVERDUE:     'overdue',
+    FLAGGED:     'flagged',      
 }
 const PRIORITY_LEVELS = {
     LOW: "low",

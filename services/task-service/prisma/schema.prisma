@@ -1,0 +1,86 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  projectId   String                            // plain UUID — never cross-query pms_project
+  workspaceId String                            // for workspace-scoped queries
+  title       String
+  description String?
+  status      String   @default("pending")      // TASK_STATUS values
+  priority    String                            // PRIORITY_LEVELS values
+  dueDate     DateTime
+  sprintId    String?                           // optional — links to Sprint.id
+  parentTask  String?                           // optional — subtask (self-ref by id)
+  createdBy     String                          // userId
+  projectHeadId String?                         // denormalized — updated via PROJECT_HEAD_CHANGED event
+  cycleCount  Int      @default(0)              // incremented on every rejection cycle
+  isFlagged   Boolean  @default(false)          // true when sprint expired — all ops frozen
+  flagReason  String?                           // discriminator for why the task was flagged
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignees   TaskAssignee[]
+  history     TaskHistory[]
+
+  @@index([projectId])
+  @@index([sprintId])
+  @@index([status])
+  @@index([workspaceId])
+  @@index([isFlagged])
+}
+
+model TaskAssignee {
+  id     String @id @default(uuid())
+  taskId String
+  userId String
+
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([userId])
+}
+
+model TaskHistory {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String
+  action    String                              // created | status_changed | approved | rejected | in_review | flagged
+  fromValue String?                             // previous status
+  toValue   String?                             // new status
+  note      String?                             // rejection reason, review notes, etc.
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+model Sprint {
+  id        String   @id @default(uuid())
+  projectId String                              // plain UUID — never cross-query pms_project
+  name      String
+  goal      String?
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+// Local read model — populated via PROJECT_DEADLINE_EXTENDED Kafka events.
+// sprint.service.js validates sprint endDate <= project endDate using this cache.
+model ProjectEndDateCache {
+  projectId String   @id
+  endDate   DateTime
+  updatedAt DateTime @updatedAt
+}

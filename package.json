@@ -18,7 +18,11 @@
     "supertokens-node": "^9.2.3",
     "zod": "^4.3.6"
   },
+  "scripts": {
+    "dev": "concurrently -n auth,workspace,project,task -c cyan,green,yellow,magenta \"npm run dev -w @pms/auth-service\" \"npm run dev -w @pms/workspace-service\" \"npm run dev -w @pms/project-service\" \"npm run dev -w @pms/task-service\""
+  },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.7",
+    "concurrently": "^9.0.0"
   }
 }
