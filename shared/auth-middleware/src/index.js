@@ -22,11 +22,12 @@ const InitAuth = ({ connectionURI, apiKey, appName, apiDomain, websiteDomain, in
 
 const AuthenticateToken = verifySession();
 
-const RequireRole = (...allowedRoles) => {
+const RequireRole = (allowedRoles) => {
+    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
     return async (req, res, next) => {
         try {
             const userRole = req.session.getAccessTokenPayload().role;
-            if (!allowedRoles.includes(userRole)) {
+            if (!roles.includes(userRole)) {
                 return next(new APIError(403, 'You do not have permission to perform this action.'));
             }
             next();

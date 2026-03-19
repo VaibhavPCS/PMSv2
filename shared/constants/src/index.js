@@ -46,11 +46,14 @@ const MAX_FILES_PER_UPLOAD = 3;
 const ALLOWED_FILE_TYPES = [
     "image/jpeg",
     "image/png",
+    "image/gif",
+    "image/webp",
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel",
-    "text/csv"
+    "text/plain",
+    "text/csv",
 ];
 
 const TOPICS = {
@@ -62,7 +65,8 @@ const TOPICS = {
     COMMS_EVENTS: 'pms.comms.events',
     NOTIFICATION_EVENTS: 'pms.notification.events',
     FILE_EVENTS: 'pms.file.events',
-    MEETING_EVENTS: 'pms.meeting.events',
+    MEETING_EVENTS:   'pms.meeting.events',
+    WORKFLOW_EVENTS:  'pms.workflow.events',
     ANALYTICS_EVENTS: 'pms.analytics.events',
 }
 
@@ -98,6 +102,7 @@ const NOTIFICATION_TYPES = {
   WORKSPACE_ROLE_CHANGED:   'WORKSPACE_ROLE_CHANGED',
   SPRINT_CREATED:   'SPRINT_CREATED',
   SPRINT_DELETED:   'SPRINT_DELETED',
+  MEETING_CREATED:         'MEETING_CREATED',
   WORKFLOW_STAGE_CHANGED:  'WORKFLOW_STAGE_CHANGED',
   WORKFLOW_SLA_BREACHED:   'WORKFLOW_SLA_BREACHED',
   WORKFLOW_ESCALATED:      'WORKFLOW_ESCALATED',

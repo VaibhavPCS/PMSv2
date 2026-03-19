@@ -63,6 +63,21 @@ services:
     depends_on:
       - zookeeper
 
+  minio:
+    image: minio/minio:latest
+    container_name: pms-minio
+    restart: unless-stopped
+    ports:
+      - '9000:9000'   
+      - '9001:9001'    
+    environment:
+      MINIO_ROOT_USER: pms_minio
+      MINIO_ROOT_PASSWORD: pms_minio_secret
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
 volumes:
   postgres-data:
   redis-data:
+  minio-data:

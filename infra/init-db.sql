@@ -10,6 +10,7 @@ CREATE DATABASE pms_workflow;
 CREATE DATABASE pms_analytics;
 CREATE DATABASE pms_meeting;
 CREATE DATABASE pms_chat;
+CREATE DATABASE pms_files;
 
 -- Grant the pms user full access to all databases
 GRANT ALL PRIVILEGES ON DATABASE pms_auth         TO pms;
@@ -21,3 +22,4 @@ GRANT ALL PRIVILEGES ON DATABASE pms_workflow     TO pms;
 GRANT ALL PRIVILEGES ON DATABASE pms_analytics    TO pms;
 GRANT ALL PRIVILEGES ON DATABASE pms_meeting      TO pms;
 GRANT ALL PRIVILEGES ON DATABASE pms_chat         TO pms;
+GRANT ALL PRIVILEGES ON DATABASE pms_files TO pms;

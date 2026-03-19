@@ -1,12 +1,36 @@
 const Nodemailer = require('nodemailer');
 
 let _transporter = null;
+
+const _escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 const _getTransporter = () => {
     if (!_transporter) {
+        const host = process.env.SMTP_HOST;
+        const port = Number(process.env.SMTP_PORT);
+        const user = process.env.SMTP_USER;
+        const pass = process.env.SMTP_PASS;
+        const allowInvalidTls = process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'false';
+
+        if (!host || !process.env.SMTP_PORT || !user || !pass) {
+            throw new Error('SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS are required.');
+        }
+
+        if (!Number.isFinite(port)) {
+            throw new Error('SMTP_PORT must be a valid number.');
+        }
+
         _transporter = Nodemailer.createTransport({
-            host: process.env.SMTP_HOST,
-            port: Number(process.env.SMTP_PORT),
-            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+            host,
+            port,
+            secure: port === 465,
+            auth: { user, pass },
+            tls: { rejectUnauthorized: !allowInvalidTls },
         });
     }
     return _transporter;
@@ -20,32 +44,42 @@ const _send = async ({ to, subject, html }) => {
             subject,
             html,
         });
+        return true;
     } catch (err) {
         console.error('[email-service] Failed to send email:', err.message);
+        return false;
     }
 };
 
 const SendTaskAssigned = async ({ recipientEmail, taskTitle, projectName }) => {
-    await _send({
+    const safeTaskTitle = _escapeHtml(taskTitle);
+    const safeProjectName = _escapeHtml(projectName);
+
+    return _send({
         to: recipientEmail,
-        subject: `[PMS] Task assigned: ${taskTitle}`,
-        html: `<p>You have been assigned task <strong>${taskTitle}</strong> in project <strong>${projectName}</strong>.</p>`,
+        subject: `[PMS] Task assigned: ${safeTaskTitle}`,
+        html: `<p>You have been assigned task <strong>${safeTaskTitle}</strong> in project <strong>${safeProjectName}</strong>.</p>`,
     });
 };
 
 const SendTaskApproved = async ({ recipientEmail, taskTitle }) => {
-    await _send({
+    const safeTaskTitle = _escapeHtml(taskTitle);
+
+    return _send({
         to: recipientEmail,
-        subject: `[PMS] Task approved: ${taskTitle}`,
-        html: `<p>Your task <strong>${taskTitle}</strong> has been approved.</p>`,
+        subject: `[PMS] Task approved: ${safeTaskTitle}`,
+        html: `<p>Your task <strong>${safeTaskTitle}</strong> has been approved.</p>`,
     });
 };
 
 const SendTaskRejected = async ({ recipientEmail, taskTitle, reason }) => {
-    await _send({
+    const safeTaskTitle = _escapeHtml(taskTitle);
+    const safeReason = _escapeHtml(reason);
+
+    return _send({
         to: recipientEmail,
-        subject: `[PMS] Task needs rework: ${taskTitle}`,
-        html: `<p>Task <strong>${taskTitle}</strong> was sent back. Reason: ${reason}</p>`,
+        subject: `[PMS] Task needs rework: ${safeTaskTitle}`,
+        html: `<p>Task <strong>${safeTaskTitle}</strong> was sent back. Reason: ${safeReason}</p>`,
     });
 };
 

@@ -1,0 +1,83 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Chat {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String?                          
+  type        String   @default("group")       
+  isArchived  Boolean  @default(false)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@index([workspaceId])
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id       String   @id @default(uuid())
+  chatId   String
+  userId   String
+  role     String   @default("member")          
+  isActive Boolean  @default(true)
+  joinedAt DateTime @default(now())
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@map("chat_participants")
+}
+
+model Message {
+  id              String   @id @default(uuid())
+  chatId          String
+  senderId        String
+  content         String                        
+  iv              String                        
+  authTag         String                        
+  isEdited        Boolean  @default(false)
+  isDeleted       Boolean  @default(false)
+  parentMessageId String?                       
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  chat      Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  reactions MessageReaction[]
+  reads     MessageRead[]
+
+  @@index([chatId, createdAt])
+  @@map("messages")
+}
+
+model MessageReaction {
+  id        String @id @default(uuid())
+  messageId String
+  userId    String
+  emoji     String
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
+}
+
+model MessageRead {
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@map("message_reads")
+}

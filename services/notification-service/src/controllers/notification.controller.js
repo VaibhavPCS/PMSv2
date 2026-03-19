@@ -4,7 +4,8 @@ const prisma = require('../config/prisma');
 const GetMyNotifications = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(50, Number(req.query.limit) || 20);
+    const parsedLimit = Number(req.query.limit);
+    const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(50, parsedLimit)) : 20;
     const skip = (page - 1) * limit;
 
     const [notifications, total] = await prisma.$transaction([

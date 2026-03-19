@@ -1,0 +1,74 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model WorkflowDefinition {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  description String?
+  definition  Json                            
+  isBuiltIn   Boolean  @default(false)        
+  isActive    Boolean  @default(true)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  instances WorkflowInstance[]
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("workflow_definitions")
+}
+
+model WorkflowInstance {
+  id                   String   @id @default(uuid())
+  workflowDefinitionId String
+  taskId               String   @unique
+  currentStage         String
+  currentAssigneeId    String?
+  isTerminal           Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  definition  WorkflowDefinition          @relation(fields: [workflowDefinitionId], references: [id])
+  history     WorkflowTransitionHistory[]
+  slaTracking WorkflowSLATracking[]
+
+  @@index([currentStage])
+  @@index([isTerminal])
+  @@map("workflow_instances")
+}
+
+model WorkflowTransitionHistory {
+  id              String   @id @default(uuid())
+  instanceId      String
+  fromStage       String
+  toStage         String
+  transitionLabel String
+  performedBy     String
+  note            String?
+  attachmentUrl   String?
+  triggeredBy     String   @default("manual")     
+  createdAt       DateTime @default(now())
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  @@index([instanceId])
+  @@map("workflow_transition_history")
+}
+
+model WorkflowSLATracking {
+  id          String    @id @default(uuid())
+  instanceId  String
+  stage       String
+  enteredAt   DateTime  @default(now())
+  exitedAt    DateTime?
+  durationMs  BigInt?                             
+  slaBreached Boolean   @default(false)
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  @@index([instanceId, stage])
+  @@index([slaBreached])
+  @@map("workflow_sla_tracking")
+}
