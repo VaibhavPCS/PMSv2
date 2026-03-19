@@ -1,8 +1,11 @@
 jest.mock('supertokens-node', () => ({
   init: jest.fn(),
-  middleware: () => (req, res, next) => next(),
-  errorHandler: () => (err, req, res, next) => next(err),
   getAllCORSHeaders: () => [],
+}));
+
+jest.mock('supertokens-node/framework/express', () => ({
+  middleware:   () => (req, res, next) => next(),
+  errorHandler: () => (err, req, res, next) => next(err),
 }));
 
 jest.mock('@pms/auth-middleware', () => ({
