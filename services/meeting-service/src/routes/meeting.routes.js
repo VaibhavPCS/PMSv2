@@ -2,7 +2,7 @@ const Router = require('express').Router();
 const { z } = require('zod');
 
 const { AuthenticateToken } = require('@pms/auth-middleware');
-const { ValidateRequest } = require('@pms/validators');
+const { ValidateRequest, ValidateQuery, GetMeetingsQuerySchema } = require('@pms/validators');
 const { CreateMeeting, GetMeetings, GetMeetingById, UpdateMeeting, CancelMeeting, UpdateRSVP, AddParticipant, RemoveParticipant } = require('../controllers/meeting.controller');
 
 const CreateMeetingSchema = z.object({
@@ -39,7 +39,7 @@ const UpdateMeetingSchema = z.object({
 const RSVPSchema = z.object({ rsvp: z.enum(['accepted', 'declined']) }).strict();
 
 Router.post('/', AuthenticateToken, ValidateRequest(CreateMeetingSchema), CreateMeeting);
-Router.get('/', AuthenticateToken, GetMeetings);
+Router.get('/', AuthenticateToken, ValidateQuery(GetMeetingsQuerySchema), GetMeetings);
 Router.get('/:id', AuthenticateToken, ValidateRequest(IdParamSchema), GetMeetingById);
 Router.patch('/:id', AuthenticateToken, ValidateRequest(IdParamSchema), ValidateRequest(UpdateMeetingSchema), UpdateMeeting);
 Router.delete('/:id', AuthenticateToken, ValidateRequest(IdParamSchema), CancelMeeting);

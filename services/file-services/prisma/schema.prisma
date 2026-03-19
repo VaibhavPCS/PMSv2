@@ -22,5 +22,6 @@ model File {
 
   @@index([entityType, entityId])
   @@index([workspaceId])
+  @@index([uploadedBy, createdAt])
   @@map("files")
 }

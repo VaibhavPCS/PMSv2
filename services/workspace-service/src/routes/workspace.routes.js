@@ -2,7 +2,7 @@ const Router  = require('express').Router();
 const { z }   = require('zod');
 
 const { AuthenticateToken }                          = require('@pms/auth-middleware');
-const { ValidateRequest, CreateWorkspaceSchema,
+const { ValidateRequest, ValidateQuery, PaginationSchema, CreateWorkspaceSchema,
         UpdateWorkspaceSchema, InviteMemberSchema,
         AcceptInviteSchema }                         = require('@pms/validators');
 
@@ -132,7 +132,7 @@ Router.post('/', AuthenticateToken, ValidateRequest(CreateWorkspaceSchema), Crea
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
  */
-Router.get('/', AuthenticateToken, GetMyWorkspaces);
+Router.get('/', AuthenticateToken, ValidateQuery(PaginationSchema), GetMyWorkspaces);
 
 /**
  * @openapi

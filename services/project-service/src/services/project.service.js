@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const { APIError } = require('@pms/error-handler');
 const { ROLES } = require('@pms/constants');
+const { parsePagination } = require('@pms/validators');
 const { PublishProjectCreated, PublishProjectUpdated, PublishProjectDeleted, PublishProjectDeadlineExtended } = require('../events/publishers');
 
 const _getActiveMember = async (projectId, userId) => {
@@ -39,17 +40,29 @@ const CreateProject = async (userId, { name, description, state, projectStatus, 
     });
 };
 
-const GetProjects = async (workspaceId, userId) => {
-    return prisma.project.findMany({
-        where: {
-            workspaceId,
-            isActive: true,
-            members: { some: { userId, isActive: true } }
-        },
-        include: {
-            members: { where: { userId }, select: { role: true } }
-        }
-    });
+const GetProjects = async (workspaceId, userId, { page, limit } = {}) => {
+    const { safePage, safeLimit } = parsePagination({ page, limit });
+
+    const where = {
+        workspaceId,
+        isActive: true,
+        members: { some: { userId, isActive: true } },
+    };
+
+    const [projects, total] = await Promise.all([
+        prisma.project.findMany({
+            where,
+            include: {
+                members: { where: { userId }, select: { role: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            skip: (safePage - 1) * safeLimit,
+            take: safeLimit,
+        }),
+        prisma.project.count({ where }),
+    ]);
+
+    return { data: projects, total, page: safePage, limit: safeLimit };
 };
 
 const GetProjectById = async (projectId, userId) => {
