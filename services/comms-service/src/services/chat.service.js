@@ -2,6 +2,8 @@ const prisma = require('../config/prisma');
 const { APIError } = require('@pms/error-handler');
 
 const CreateChat = async (createdBy, workspaceId, { name, type, participantIds }) => {
+    const uniqueParticipants = [...new Set([...(Array.isArray(participantIds) ? participantIds : []), createdBy])];
+
     const chat = await prisma.chat.create({
         data: {
             workspaceId,
@@ -9,7 +11,7 @@ const CreateChat = async (createdBy, workspaceId, { name, type, participantIds }
             type,
             createdBy,
             participants: {
-                create: participantIds.map((userId) => ({
+                create: uniqueParticipants.map((userId) => ({
                     userId,
                     role: userId === createdBy ? 'admin' : 'member',
                 })),
@@ -43,11 +45,16 @@ const GetChatById = async (chatId, userId) => {
 };
 
 const AddParticipant = async (chatId, requesterId, userId) => {
-    await GetChatById(chatId, requesterId);
+    const chat = await GetChatById(chatId, requesterId);
+    const requesterParticipant = chat.participants.find((p) => p.userId === requesterId && p.isActive);
+    if (!requesterParticipant || requesterParticipant.role !== 'admin') {
+      throw new APIError(403, 'Only admins can add participants');
+    }
+
     await prisma.chatParticipant.upsert({
         where: { chatId_userId: { chatId, userId } },
         update: { isActive: true },
-        create: { chatId, userId },
+        create: { chatId, userId, role: 'member' },
     });
 };
 
@@ -55,6 +62,10 @@ const RemoveParticipant = async (chatId, requesterId, userId) => {
     const chat = await GetChatById(chatId, requesterId);
     const requesterParticipant = chat.participants.find((p) => p.userId === requesterId);
     if (requesterParticipant.role !== 'admin') throw new APIError(403, 'Only admins can remove participants');
+
+    const targetParticipant = chat.participants.find((p) => p.userId === userId);
+    if (!targetParticipant) throw new APIError(404, 'Participant not found in chat');
+
     await prisma.chatParticipant.update({
         where: { chatId_userId: { chatId, userId } },
         data: { isActive: false },

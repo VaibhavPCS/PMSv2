@@ -33,6 +33,7 @@ model MeetingParticipant {
   userId    String
   rsvp      String    @default("pending")      
   joinedAt  DateTime?
+  reminderSentAt DateTime?
 
   meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 

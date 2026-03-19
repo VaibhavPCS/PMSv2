@@ -8,9 +8,19 @@ const App = require('./app');
 const Logger = CreateLogger('file-service');
 const PORT = process.env.PORT || 4008;
 
-const Server = App.listen(PORT, async () => {
-  Logger.info(`file-service running on port ${PORT}`);
-  await EnsureBucket();
-});
+const StartServer = async () => {
+  try {
+    await EnsureBucket();
+  } catch (err) {
+    Logger.error(`file-service failed to initialize MinIO bucket: ${err.message}`);
+    process.exit(1);
+  }
 
-HandleUnhandledRejection(Server);
+  const Server = App.listen(PORT, () => {
+    Logger.info(`file-service running on port ${PORT}`);
+  });
+
+  HandleUnhandledRejection(Server);
+};
+
+StartServer();

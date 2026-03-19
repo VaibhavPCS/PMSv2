@@ -14,10 +14,12 @@ const CreateChatSchema = z.object({
     participantIds: z.array(z.string().uuid()).min(1),
 }).strict();
 
+const AddParticipantSchema = z.object({ userId: z.string().uuid() }).strict();
+
 Router.post('/',                          AuthenticateToken, ValidateRequest(CreateChatSchema), CreateChat);
 Router.get('/',                           AuthenticateToken, GetMyChats);
 Router.get('/:id',                        AuthenticateToken, GetChatById);
-Router.post('/:id/participants',          AuthenticateToken, AddParticipant);
+Router.post('/:id/participants',          AuthenticateToken, ValidateRequest(AddParticipantSchema), AddParticipant);
 Router.delete('/:id/participants/:userId',AuthenticateToken, RemoveParticipant);
 Router.patch('/:id/archive',              AuthenticateToken, ArchiveChat);
 

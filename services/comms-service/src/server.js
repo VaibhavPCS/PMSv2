@@ -13,8 +13,13 @@ const Server = http.createServer(App);
 const io = AttachSocket(Server);
 App.set('io', io);
 
+HandleUnhandledRejection(Server);
+
+Server.on('error', (err) => {
+  Logger.error(`comms-service failed to bind: ${err.code || 'UNKNOWN'} ${err.message}`);
+  process.exit(1);
+});
+
 Server.listen(PORT, () => {
   Logger.info(`comms-service running on port ${PORT}`);
 });
-
-HandleUnhandledRejection(Server);

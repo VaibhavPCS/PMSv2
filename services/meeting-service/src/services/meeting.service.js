@@ -3,6 +3,7 @@ const { APIError } = require('@pms/error-handler');
 const { PublishMeetingCreated } = require('../events/publishers');
 
 const CreateMeeting = async (createdBy, { workspaceId, projectId, title, description, startTime, endTime, meetingLink, participantIds }) => {
+  const safeParticipantIds = Array.isArray(participantIds) ? participantIds : [];
   const meeting = await prisma.meeting.create({
     data: {
       workspaceId,
@@ -14,9 +15,10 @@ const CreateMeeting = async (createdBy, { workspaceId, projectId, title, descrip
       meetingLink,
       createdBy,
       participants: {
-        create: participantIds.map((userId) => ({ userId })),
+        create: safeParticipantIds.map((userId) => ({ userId })),
       },
     },
+    include: { participants: true },
   });
 
   PublishMeetingCreated(meeting).catch((err) =>
@@ -84,6 +86,9 @@ const CancelMeeting = async (meetingId, userId) => {
 };
 
 const UpdateRSVP = async (meetingId, userId, rsvp) => {
+  const meeting = await prisma.meeting.findUnique({ where: { id: meetingId } });
+  if (!meeting) throw new APIError(404, 'Meeting not found');
+
   const result = await prisma.meetingParticipant.updateMany({
     where: { meetingId, userId },
     data: { rsvp },
@@ -113,9 +118,7 @@ const RemoveParticipant = async (meetingId, requesterId, userId) => {
     throw new APIError(403, 'Only the creator can remove participants.');
   }
 
-  await prisma.meetingParticipant.delete({
-    where: { meetingId_userId: { meetingId, userId } },
-  });
+  await prisma.meetingParticipant.deleteMany({ where: { meetingId, userId } });
 };
 
 module.exports = {

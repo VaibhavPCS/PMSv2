@@ -20,15 +20,30 @@ const _send = async ({ to, subject, html }) => {
       subject,
       html,
     });
+    return true;
   } catch (err) {
     console.error('[email-service] Failed to send meeting reminder:', err.message);
+    return false;
   }
 };
 
-// userId is the participant's user ID. In production, resolve to an email address
-// via the user-service (internal HTTP call or shared cache) before calling _send.
 const SendMeetingReminder = async (userId, meeting) => {
-  console.info(`[email-service] Reminder queued — user: ${userId}, meeting: "${meeting.title}", starts: ${meeting.startTime}`);
+  const redactedUser = typeof userId === 'string' ? `${userId.slice(0, 4)}...` : 'unknown';
+  const to = meeting.participantEmail;
+
+  if (!to) {
+    throw new Error(`Cannot send meeting reminder: participant email missing for meeting ${meeting.id}. user=${redactedUser}`);
+  }
+
+  const sent = await _send({
+    to,
+    subject: `[PMS] Reminder: ${meeting.title}`,
+    html: `<p>Reminder: meeting <strong>${meeting.title}</strong> starts at ${new Date(meeting.startTime).toISOString()}.</p>`,
+  });
+
+  if (!sent) {
+    throw new Error(`Failed to send meeting reminder for meeting ${meeting.id}.`);
+  }
 };
 
 module.exports = { SendMeetingReminder };

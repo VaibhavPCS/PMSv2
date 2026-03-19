@@ -42,10 +42,16 @@ const DispatchNotification = async (eventId, topic, event) => {
         );
         break;
 
-      case NOTIFICATION_TYPES.TASK_APPROVED:
+      case NOTIFICATION_TYPES.TASK_APPROVED: {
+        const assigneeIds = Array.isArray(event.assigneeIds) ? event.assigneeIds : [];
+        if (assigneeIds.length === 0) {
+          console.warn(`Skipping TASK_APPROVED notification for event ${eventId}: no assigneeIds provided.`);
+          return;
+        }
+
         await _createBatch(
           eventId,
-          event.assigneeIds,
+          assigneeIds,
           {
             type: NOTIFICATION_TYPES.TASK_APPROVED,
             title: 'Your task has been approved',
@@ -56,6 +62,7 @@ const DispatchNotification = async (eventId, topic, event) => {
         );
         await EmailService.SendTaskApproved(event);
         break;
+      }
 
       case NOTIFICATION_TYPES.TASK_REJECTED:
         await _createOne(
@@ -100,10 +107,16 @@ const DispatchNotification = async (eventId, topic, event) => {
         );
         break;
 
-      case NOTIFICATION_TYPES.MEETING_CREATED:
+      case NOTIFICATION_TYPES.MEETING_CREATED: {
+        const participantIds = Array.isArray(event.participantIds) ? event.participantIds : [];
+        if (participantIds.length === 0) {
+          console.warn(`Skipping MEETING_CREATED notification for event ${eventId}: no participantIds provided.`);
+          return;
+        }
+
         await _createBatch(
           eventId,
-          event.participantIds,
+          participantIds,
           {
             type: NOTIFICATION_TYPES.MEETING_CREATED,
             title: 'New meeting scheduled',
@@ -113,6 +126,7 @@ const DispatchNotification = async (eventId, topic, event) => {
           }
         );
         break;
+      }
       default:
         console.warn(`Unrecognized event type: ${event.type}`);
         break;

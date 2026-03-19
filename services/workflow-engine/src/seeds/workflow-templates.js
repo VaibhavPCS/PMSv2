@@ -133,8 +133,8 @@ const SeedBuiltInTemplates = async (workspaceId, createdBy) => {
     return;
   }
 
-  for (const template of TEMPLATES) {
-    await prisma.workflowDefinition.create({
+  await prisma.$transaction(
+    TEMPLATES.map((template) => prisma.workflowDefinition.create({
       data: {
         workspaceId,
         name:        template.name,
@@ -143,8 +143,8 @@ const SeedBuiltInTemplates = async (workspaceId, createdBy) => {
         definition:  template.definition,
         createdBy,
       },
-    });
-  }
+    }))
+  );
 
   console.log(`[workflow-seed] Seeded ${TEMPLATES.length} built-in workflow templates for workspace ${workspaceId}.`);
 };

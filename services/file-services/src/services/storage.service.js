@@ -11,7 +11,9 @@ const Upload = async (workspaceId, entityId, buffer, originalname, mimetype) => 
 };
 
 const GetPresignedUrl = async (objectKey) => {
-  return await client.presignedGetObject(BUCKET, objectKey, Number(process.env.PRESIGNED_URL_EXPIRY));
+  const parsedExpiry = Number(process.env.PRESIGNED_URL_EXPIRY);
+  const expiry = Number.isFinite(parsedExpiry) && parsedExpiry > 0 ? Math.trunc(parsedExpiry) : 3600;
+  return await client.presignedGetObject(BUCKET, objectKey, expiry);
 };
 
 const Delete = async (objectKey) => {

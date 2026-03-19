@@ -54,20 +54,22 @@ const _send = async ({ to, subject, html }) => {
 const SendTaskAssigned = async ({ recipientEmail, taskTitle, projectName }) => {
     const safeTaskTitle = _escapeHtml(taskTitle);
     const safeProjectName = _escapeHtml(projectName);
+    const plainTaskTitle = String(taskTitle ?? 'Task');
 
     return _send({
         to: recipientEmail,
-        subject: `[PMS] Task assigned: ${safeTaskTitle}`,
+        subject: `[PMS] Task assigned: ${plainTaskTitle}`,
         html: `<p>You have been assigned task <strong>${safeTaskTitle}</strong> in project <strong>${safeProjectName}</strong>.</p>`,
     });
 };
 
 const SendTaskApproved = async ({ recipientEmail, taskTitle }) => {
     const safeTaskTitle = _escapeHtml(taskTitle);
+    const plainTaskTitle = String(taskTitle ?? 'Task');
 
     return _send({
         to: recipientEmail,
-        subject: `[PMS] Task approved: ${safeTaskTitle}`,
+        subject: `[PMS] Task approved: ${plainTaskTitle}`,
         html: `<p>Your task <strong>${safeTaskTitle}</strong> has been approved.</p>`,
     });
 };
@@ -75,10 +77,11 @@ const SendTaskApproved = async ({ recipientEmail, taskTitle }) => {
 const SendTaskRejected = async ({ recipientEmail, taskTitle, reason }) => {
     const safeTaskTitle = _escapeHtml(taskTitle);
     const safeReason = _escapeHtml(reason);
+    const plainTaskTitle = String(taskTitle ?? 'Task');
 
     return _send({
         to: recipientEmail,
-        subject: `[PMS] Task needs rework: ${safeTaskTitle}`,
+        subject: `[PMS] Task needs rework: ${plainTaskTitle}`,
         html: `<p>Task <strong>${safeTaskTitle}</strong> was sent back. Reason: ${safeReason}</p>`,
     });
 };

@@ -9,6 +9,16 @@ const { ErrorHandler, NotFoundHandler } = require('@pms/error-handler');
 const ChatRoutes = require('./routes/chat.routes');
 const MessageRoutes = require('./routes/message.routes');
 
+const EnsureEnv = (...keys) => {
+  keys.forEach((key) => {
+    if (!process.env[key] || !process.env[key].trim()) {
+      throw new Error(`Missing required env var: ${key}`);
+    }
+  });
+};
+
+EnsureEnv('SUPERTOKENS_CONNECTION_URI', 'SUPERTOKENS_API_KEY', 'API_DOMAIN', 'WEBSITE_DOMAIN');
+
 InitAuth({
   connectionURI:        process.env.SUPERTOKENS_CONNECTION_URI,
   apiKey:               process.env.SUPERTOKENS_API_KEY,

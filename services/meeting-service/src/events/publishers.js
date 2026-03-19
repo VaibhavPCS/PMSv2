@@ -3,8 +3,16 @@ const { TOPICS }                       = require('@pms/constants');
 
 let _producer = null;
 const getProducer = async () => {
-  if (!_producer) _producer = await CreateProducer([process.env.KAFKA_BROKER]);
-  return _producer;
+  if (!_producer) {
+    _producer = CreateProducer([process.env.KAFKA_BROKER]);
+  }
+
+  try {
+    return await _producer;
+  } catch (err) {
+    _producer = null;
+    throw err;
+  }
 };
 
 const PublishMeetingCreated = (meeting) => getProducer().then((producer) =>
@@ -14,7 +22,7 @@ const PublishMeetingCreated = (meeting) => getProducer().then((producer) =>
     workspaceId: meeting.workspaceId,
     title: meeting.title,
     startTime: meeting.startTime,
-    participantIds: meeting.participants.map(p => p.userId),
+    participantIds: (meeting.participants || []).map((p) => p.userId),
     timestamp: Date.now(),
   })
 );

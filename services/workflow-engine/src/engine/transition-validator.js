@@ -1,6 +1,12 @@
 const { APIError } = require('@pms/error-handler');
 
 function ValidateTransition(definition, currentStage, toStage, userRole, payload, triggeredBy) {
+  const safePayload = payload || {};
+
+  if (!payload) {
+    throw new APIError(400, 'Payload is required');
+  }
+
   const transition = definition.transitions.find((t) => t.from === currentStage && t.to === toStage);
   if (!transition) {
     throw new APIError(400, `No transition defined from ${currentStage} to ${toStage}.`);
@@ -11,13 +17,13 @@ function ValidateTransition(definition, currentStage, toStage, userRole, payload
   if (transition.githubTrigger && triggeredBy !== 'github_webhook') {
     throw new APIError(400, 'This transition can only be triggered by a GitHub webhook.');
   }
-  if (transition.requiresNote && !payload.note?.trim()) {
+  if (transition.requiresNote && !safePayload.note?.trim()) {
     throw new APIError(400, 'A note is required for this transition.');
   }
-  if (transition.requiresAttachment && !payload.attachmentUrl) {
+  if (transition.requiresAttachment && !safePayload.attachmentUrl?.trim()) {
     throw new APIError(400, 'An attachment is required for this transition.');
   }
-  if (transition.requiresReferenceLink && !payload.referenceLink) {
+  if (transition.requiresReferenceLink && !safePayload.referenceLink?.trim()) {
     throw new APIError(400, 'A reference link is required for this transition.');
   }
   return transition;

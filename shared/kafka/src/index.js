@@ -26,7 +26,7 @@ const SubscribeToTopics = async (consumer, topics, handler) => {
         eachMessage: async ({ topic, partition, message }) => {
             const key = message.key?.toString() ?? null;
             const value = JSON.parse(message.value.toString());
-            handler({ topic, key, value });
+            await handler({ topic, key, value });
         },
     });
 };

@@ -30,6 +30,7 @@ model WorkflowInstance {
   taskId               String   @unique
   currentStage         String
   currentAssigneeId    String?
+  createdBy            String
   isTerminal           Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -38,8 +39,10 @@ model WorkflowInstance {
   history     WorkflowTransitionHistory[]
   slaTracking WorkflowSLATracking[]
 
+  @@index([workflowDefinitionId])
   @@index([currentStage])
   @@index([isTerminal])
+  @@index([isTerminal, currentStage])
   @@map("workflow_instances")
 }
 
@@ -52,6 +55,7 @@ model WorkflowTransitionHistory {
   performedBy     String
   note            String?
   attachmentUrl   String?
+  referenceLink   String?
   triggeredBy     String   @default("manual")     
   createdAt       DateTime @default(now())
   instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)

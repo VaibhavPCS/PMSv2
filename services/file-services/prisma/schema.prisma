@@ -16,7 +16,7 @@ model File {
   filename    String                          
   storagePath String                          
   mimeType    String
-  sizeBytes   Int
+  sizeBytes   BigInt
   isDeleted   Boolean  @default(false)
   createdAt   DateTime @default(now())
 

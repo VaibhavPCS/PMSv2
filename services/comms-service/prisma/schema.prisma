@@ -35,6 +35,7 @@ model ChatParticipant {
   chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@unique([chatId, userId])
+  @@index([userId])
   @@map("chat_participants")
 }
 
@@ -52,6 +53,8 @@ model Message {
   updatedAt       DateTime @updatedAt
 
   chat      Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  parentMessage Message?      @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: SetNull)
+  replies Message[]           @relation("MessageReplies")
   reactions MessageReaction[]
   reads     MessageRead[]
 

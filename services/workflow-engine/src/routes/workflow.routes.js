@@ -12,9 +12,17 @@ const CreateWorkflowSchema = z.object({
     definition: z.object({}).passthrough(),     
 }).strict();
 
+const UpdateWorkflowSchema = z.object({
+    name: z.string().min(2).optional(),
+    description: z.string().optional(),
+    definition: z.object({}).passthrough().optional(),
+}).strict();
+
+const IdParamSchema = z.object({ id: z.string().uuid() }).strict();
+
 Router.post('/', AuthenticateToken, RequireRole([ROLES.ADMIN, ROLES.OWNER]), ValidateRequest(CreateWorkflowSchema), CreateWorkflow);
 Router.get('/', AuthenticateToken, GetWorkflows);
-Router.get('/:id', AuthenticateToken, GetWorkflowById);
-Router.patch('/:id', AuthenticateToken, RequireRole([ROLES.ADMIN, ROLES.OWNER]), UpdateWorkflow);
-Router.delete('/:id', AuthenticateToken, RequireRole([ROLES.ADMIN, ROLES.OWNER]), DeleteWorkflow);
+Router.get('/:id', AuthenticateToken, ValidateRequest(IdParamSchema), GetWorkflowById);
+Router.patch('/:id', AuthenticateToken, ValidateRequest(IdParamSchema), RequireRole([ROLES.ADMIN, ROLES.OWNER]), ValidateRequest(UpdateWorkflowSchema), UpdateWorkflow);
+Router.delete('/:id', AuthenticateToken, ValidateRequest(IdParamSchema), RequireRole([ROLES.ADMIN, ROLES.OWNER]), DeleteWorkflow);
 module.exports = Router;

@@ -22,8 +22,12 @@ const InitAuth = ({ connectionURI, apiKey, appName, apiDomain, websiteDomain, in
 
 const AuthenticateToken = verifySession();
 
-const RequireRole = (allowedRoles) => {
-    const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+const RequireRole = (...allowedRoles) => {
+    const passedArray = allowedRoles.length === 1 && Array.isArray(allowedRoles[0]);
+    if (passedArray) {
+        console.warn('[auth-middleware] RequireRole received an array argument. Prefer variadic roles for compatibility.');
+    }
+    const roles = passedArray ? allowedRoles[0] : allowedRoles;
     return async (req, res, next) => {
         try {
             const userRole = req.session.getAccessTokenPayload().role;

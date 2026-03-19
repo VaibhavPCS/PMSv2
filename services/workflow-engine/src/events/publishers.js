@@ -3,8 +3,16 @@ const { TOPICS } = require('@pms/constants');
 
 let _producer = null;
 const getProducer = async () => {
-    if (!_producer) _producer = await CreateProducer([process.env.KAFKA_BROKER]);
-    return _producer;
+    if (!_producer) {
+        _producer = CreateProducer([process.env.KAFKA_BROKER]);
+    }
+
+    try {
+        return await _producer;
+    } catch (err) {
+        _producer = null;
+        throw err;
+    }
 };
 
 const PublishWorkflowTransitioned = async (taskId, fromStage, toStage, performedBy, isTerminal) => {

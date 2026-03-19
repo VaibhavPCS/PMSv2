@@ -1,10 +1,16 @@
 const { Server } = require('socket.io');
 const SuperTokens = require('supertokens-node');
+const prisma = require('../config/prisma');
 
 const AttachSocket = (httpServer) => {
+  const allowedOrigin = process.env.WEBSITE_DOMAIN;
+  if (!allowedOrigin || !allowedOrigin.trim()) {
+    throw new Error('Missing required env var: WEBSITE_DOMAIN');
+  }
+
   const io = new Server(httpServer, {
     cors: {
-      origin:      process.env.WEBSITE_DOMAIN,
+      origin:      allowedOrigin,
       credentials: true,
     },
   });
@@ -26,8 +32,26 @@ const AttachSocket = (httpServer) => {
 
   io.on('connection', (socket) => {
     // Client joins a specific chat room — call on chat open
-    socket.on('join-chat', (chatId) => {
-      socket.join(`chat:${chatId}`);
+    socket.on('join-chat', async (chatId) => {
+      try {
+        if (typeof chatId !== 'string' || !chatId.trim()) {
+          socket.emit('error', { message: 'Invalid chatId' });
+          return;
+        }
+
+        const participant = await prisma.chatParticipant.findFirst({
+          where: { chatId, userId: socket.userId, isActive: true },
+        });
+
+        if (!participant) {
+          socket.emit('permission-denied', { chatId });
+          return;
+        }
+
+        socket.join(`chat:${chatId}`);
+      } catch (err) {
+        socket.emit('error', { message: 'Failed to join chat' });
+      }
     });
 
     // Client leaves a chat room — call on chat close / navigation away
@@ -38,6 +62,14 @@ const AttachSocket = (httpServer) => {
 
     // Typing indicator — broadcast to everyone else in the chat
     socket.on('typing', ({ chatId, typing }) => {
+      if (typeof chatId !== 'string' || !chatId.trim()) {
+        return;
+      }
+
+      if (!socket.rooms.has(`chat:${chatId}`)) {
+        return;
+      }
+
       socket.to(`chat:${chatId}`).emit('typing', {
         userId: socket.userId,
         chatId,

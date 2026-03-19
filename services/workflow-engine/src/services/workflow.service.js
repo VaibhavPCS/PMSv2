@@ -14,7 +14,7 @@ const ListDefinitions = async (workspaceId) => {
 };
 
 const GetDefinition = async (id) => {
-  const def = await prisma.workflowDefinition.findUnique({ where: { id } });
+  const def = await prisma.workflowDefinition.findFirst({ where: { id, isActive: true } });
   if (!def) throw new APIError(404, 'Workflow definition not found.');
   return def;
 };
@@ -27,6 +27,10 @@ const UpdateDefinition = async (id, { name, description, definition }) => {
   if (name !== undefined) data.name = name;
   if (description !== undefined) data.description = description;
   if (definition !== undefined) data.definition = definition;
+
+  if (Object.keys(data).length === 0) {
+    return existing;
+  }
 
   return prisma.workflowDefinition.update({ where: { id }, data });
 };

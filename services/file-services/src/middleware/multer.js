@@ -1,4 +1,5 @@
 const multer = require('multer');
+const { fileTypeFromBuffer } = require('file-type');
 const { MAX_FILE_SIZE, MAX_FILES_PER_UPLOAD, ALLOWED_FILE_TYPES } = require('@pms/constants');
 
 const Storage = multer.memoryStorage();
@@ -14,6 +15,33 @@ const FileFilter = (req, file, cb) => {
 
 const Upload = multer({ storage: Storage, limits: Limits, fileFilter: FileFilter });
 
+const ValidateFileContent = async (req, res, next) => {
+  try {
+    const files = [];
+
+    if (req.file) files.push(req.file);
+    if (Array.isArray(req.files)) files.push(...req.files);
+    if (req.files && !Array.isArray(req.files)) {
+      Object.values(req.files).forEach((group) => files.push(...group));
+    }
+
+    for (const file of files) {
+      const detected = await fileTypeFromBuffer(file.buffer);
+      const detectedMime = detected?.mime || file.mimetype;
+
+      if (!ALLOWED_FILE_TYPES.includes(detectedMime)) {
+        return res.status(400).json({ status: 'fail', message: 'Uploaded file content type is not allowed' });
+      }
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+const DefaultOptions = { storage: Storage, limits: Limits, fileFilter: FileFilter };
+
 module.exports = {
   Upload,
   Middleware: {
@@ -21,7 +49,17 @@ module.exports = {
     Multiple: (fieldName, maxCount) => Upload.array(fieldName, maxCount ?? MAX_FILES_PER_UPLOAD),
     Fields:   (fields)             => Upload.fields(fields),
     Any:      ()                   => Upload.any(),
-    Custom:   (options)            => multer(options).any(),
+    Custom:   (options = {})       => {
+      const mergedOptions = {
+        ...DefaultOptions,
+        ...options,
+        storage: DefaultOptions.storage,
+        limits: DefaultOptions.limits,
+        fileFilter: DefaultOptions.fileFilter,
+      };
+      return multer(mergedOptions).any();
+    },
+    ValidateFileContent,
   },
   ErrorHandler: {
     MulterError: (err, req, res, next) => {

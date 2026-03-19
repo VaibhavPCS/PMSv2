@@ -12,23 +12,26 @@ const CreateInstance = async (taskId, workflowDefinitionId, createdBy) => {
     throw new APIError(404, 'Workflow definition not found or inactive.');
   }
 
-  const instance = await prisma.workflowInstance.create({
-    data: {
-      taskId,
-      workflowDefinitionId,
-      currentStage: definition.definition.initialStage,
-    },
-  });
+  return prisma.$transaction(async (tx) => {
+    const instance = await tx.workflowInstance.create({
+      data: {
+        taskId,
+        workflowDefinitionId,
+        currentStage: definition.definition.initialStage,
+        createdBy,
+      },
+    });
 
-  await prisma.workflowSLATracking.create({
-    data: {
-      instanceId: instance.id,
-      stage:      definition.definition.initialStage,
-      enteredAt:  new Date(),
-    },
-  });
+    await tx.workflowSLATracking.create({
+      data: {
+        instanceId: instance.id,
+        stage:      definition.definition.initialStage,
+        enteredAt:  new Date(),
+      },
+    });
 
-  return instance;
+    return instance;
+  });
 };
 
 const GetInstance = async (taskId) => {
@@ -47,18 +50,25 @@ const GetInstance = async (taskId) => {
 };
 
 const TransitionStage = async (taskId, { toStage, note, attachmentUrl, referenceLink }, userId, userRole, triggeredBy = 'manual') => {
-  const instance = await GetInstance(taskId);
-  if (instance.isTerminal) {
-    throw new APIError(400, 'Task is at a terminal stage. No further transitions allowed.');
-  }
+  const transitionResult = await prisma.$transaction(async (tx) => {
+    const instance = await tx.workflowInstance.findUnique({
+      where: { taskId },
+      include: { definition: true },
+    });
 
-  const definition = instance.definition.definition;
-  const transition = ValidateTransition(definition, instance.currentStage, toStage, userRole, { note, attachmentUrl, referenceLink }, triggeredBy);
+    if (!instance) {
+      throw new APIError(404, 'Workflow instance not found for the given task.');
+    }
 
-  const fromStage = instance.currentStage;
-  const isTerminal = definition.terminalStages.includes(toStage);
+    if (instance.isTerminal) {
+      throw new APIError(400, 'Task is at a terminal stage. No further transitions allowed.');
+    }
 
-  await prisma.$transaction(async (tx) => {
+    const definition = instance.definition.definition;
+    const transition = ValidateTransition(definition, instance.currentStage, toStage, userRole, { note, attachmentUrl, referenceLink }, triggeredBy);
+    const fromStage = instance.currentStage;
+    const isTerminal = definition.terminalStages.includes(toStage);
+
     await tx.workflowInstance.update({
       where: { id: instance.id },
       data: { currentStage: toStage, isTerminal },
@@ -73,6 +83,7 @@ const TransitionStage = async (taskId, { toStage, note, attachmentUrl, reference
         performedBy:     userId,
         note,
         attachmentUrl,
+        referenceLink,
         triggeredBy,
       },
     });
@@ -91,17 +102,25 @@ const TransitionStage = async (taskId, { toStage, note, attachmentUrl, reference
         },
       });
     }
+
+    return {
+      instanceId: instance.id,
+      definition,
+      fromStage,
+      isTerminal,
+    };
   });
 
-  if (definition.autoAssignRole) {
-    const currentAssigneeId = await AutoAssign(definition.autoAssignRole, toStage);
+  if (transitionResult.definition.autoAssignRole) {
+    const currentAssigneeId = await AutoAssign(transitionResult.definition.autoAssignRole, toStage);
     await prisma.workflowInstance.update({
-      where: { id: instance.id },
+      where: { id: transitionResult.instanceId },
       data: { currentAssigneeId },
     });
   }
 
-  PublishWorkflowTransitioned(taskId, fromStage, toStage, userId, isTerminal);
+  await PublishWorkflowTransitioned(taskId, transitionResult.fromStage, toStage, userId, transitionResult.isTerminal)
+    .catch((err) => console.error('[workflow-engine] failed to publish transition event', { taskId, fromStage: transitionResult.fromStage, toStage, userId, error: err.message }));
 
   return GetInstance(taskId);
 };

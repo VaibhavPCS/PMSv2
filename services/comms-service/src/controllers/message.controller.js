@@ -18,7 +18,8 @@ const SendMessage = CatchAsync(async (req, res) => {
 const GetMessages = CatchAsync(async (req, res) => {
     const userId   = req.session.getUserId();
     const page     = Math.max(1, Number(req.query.page)  || 1);
-    const limit    = Math.min(50, Number(req.query.limit) || 20);
+    const parsedLimit = Number(req.query.limit);
+    const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(50, parsedLimit)) : 20;
     const messages = await MessageService.GetMessages(req.params.chatId, userId, page, limit);
     res.status(200).json({ status: 'success', data: messages });
 });
@@ -39,19 +40,17 @@ const DeleteMessage = CatchAsync(async (req, res) => {
 
 const AddReaction = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
-    await MessageService.AddReaction(req.params.id, userId, req.body.emoji);
-    if (req.body.chatId) {
-        _emit(req, 'reaction-updated', req.body.chatId, { messageId: req.params.id, userId, emoji: req.body.emoji, action: 'add' });
-    }
+    const result = await MessageService.AddReaction(req.params.id, userId, req.body.emoji);
+    const chatId = result?.chatId;
+    if (chatId) _emit(req, 'reaction-updated', chatId, { messageId: req.params.id, userId, emoji: req.body.emoji, action: 'add' });
     res.status(200).json({ status: 'success', data: null });
 });
 
 const RemoveReaction = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
-    await MessageService.RemoveReaction(req.params.id, userId, req.body.emoji);
-    if (req.body.chatId) {
-        _emit(req, 'reaction-updated', req.body.chatId, { messageId: req.params.id, userId, emoji: req.body.emoji, action: 'remove' });
-    }
+    const result = await MessageService.RemoveReaction(req.params.id, userId, req.body.emoji);
+    const chatId = result?.chatId;
+    if (chatId) _emit(req, 'reaction-updated', chatId, { messageId: req.params.id, userId, emoji: req.body.emoji, action: 'remove' });
     res.status(200).json({ status: 'success', data: null });
 });
 
