@@ -14,13 +14,12 @@ const Server = App.listen(PORT, () => {
   Logger.info(`meeting-service running on port ${PORT}`);
 
   if (!checkerStarted) {
-    try {
-      StartReminderChecker();
-      checkerStarted = true;
-    } catch (err) {
-      Logger.error(`meeting-service failed to start reminder checker: ${err.message}`);
-      process.exit(1);
-    }
+    StartReminderChecker()
+      .then(() => { checkerStarted = true; })
+      .catch((err) => {
+        Logger.error(`meeting-service failed to start reminder checker: ${err.message}`);
+        process.exit(1);
+      });
   }
 });
 

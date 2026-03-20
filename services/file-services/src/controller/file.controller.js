@@ -1,6 +1,8 @@
 const { CatchAsync, APIError } = require('@pms/error-handler');
 const FileService = require('../services/file.service');
 
+const MAX_LIMIT = Number(process.env.FILE_LIST_MAX_LIMIT) || 100;
+
 const UploadFile = CatchAsync(async (req, res) => {
     if (!req.file) throw new APIError(400, 'No file uploaded');
     const userId = req.session.getUserId();
@@ -26,11 +28,13 @@ const ListFiles = CatchAsync(async (req, res) => {
     if (typeof entityType !== 'string' || !entityType.trim()) throw new APIError(400, 'entityType is required');
     if (typeof entityId !== 'string' || !entityId.trim()) throw new APIError(400, 'entityId is required');
 
-    const limit = Number(req.query.limit);
-    const offset = Number(req.query.offset);
+    const rawLimit = Number(req.query.limit);
+    const rawOffset = Number(req.query.offset);
+    const limit = Number.isFinite(rawLimit) && rawLimit >= 0 ? Math.floor(rawLimit) : 20;
+    const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
     const files = await FileService.ListFiles(entityType, entityId, userId, {
-        limit: Number.isFinite(limit) ? limit : 20,
-        offset: Number.isFinite(offset) ? offset : 0,
+        limit: Math.min(limit, MAX_LIMIT),
+        offset,
     });
     res.status(200).json({ status: 'success', data: files });
 });

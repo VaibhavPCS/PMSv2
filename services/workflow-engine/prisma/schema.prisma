@@ -30,7 +30,7 @@ model WorkflowInstance {
   taskId               String   @unique
   currentStage         String
   currentAssigneeId    String?
-  createdBy            String
+  createdBy            String   @default("system")
   isTerminal           Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

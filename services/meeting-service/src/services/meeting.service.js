@@ -34,10 +34,21 @@ const GetMeetings = async (workspaceId, userId, from, to, { page, limit } = {}) 
   // preventing enumeration of all workspace meetings.
   const { safePage, safeLimit } = parsePagination({ page, limit });
 
+  if (!from || !to) {
+    throw new APIError(400, 'from and to are required query parameters.');
+  }
+
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  if (Number.isNaN(fromDate.valueOf()) || Number.isNaN(toDate.valueOf())) {
+    throw new APIError(400, 'from and to must be valid ISO date values.');
+  }
+
   const where = {
     workspaceId,
     isActive: true,
-    startTime: { gte: new Date(from), lte: new Date(to) },
+    startTime: { gte: fromDate, lte: toDate },
     participants: { some: { userId } },
   };
 
@@ -108,6 +119,7 @@ const CancelMeeting = async (meetingId, userId) => {
 const UpdateRSVP = async (meetingId, userId, rsvp) => {
   const meeting = await prisma.meeting.findUnique({ where: { id: meetingId } });
   if (!meeting) throw new APIError(404, 'Meeting not found');
+  if (!meeting.isActive) throw new APIError(400, 'Meeting is not active');
 
   const result = await prisma.meetingParticipant.updateMany({
     where: { meetingId, userId },

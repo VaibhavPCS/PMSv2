@@ -9,10 +9,13 @@ const getProducer = async () => {
     _producer = CreateProducer([process.env.KAFKA_BROKER]);
   }
 
+  const localRef = _producer;
   try {
-    return await _producer;
+    return await localRef;
   } catch (err) {
-    _producer = null;
+    if (_producer === localRef) {
+      _producer = null;
+    }
     throw err;
   }
 };

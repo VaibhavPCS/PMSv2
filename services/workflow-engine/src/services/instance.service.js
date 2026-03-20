@@ -112,11 +112,20 @@ const TransitionStage = async (taskId, { toStage, note, attachmentUrl, reference
   });
 
   if (transitionResult.definition.autoAssignRole) {
-    const currentAssigneeId = await AutoAssign(transitionResult.definition.autoAssignRole, toStage);
-    await prisma.workflowInstance.update({
-      where: { id: transitionResult.instanceId },
-      data: { currentAssigneeId },
-    });
+    try {
+      const currentAssigneeId = await AutoAssign(transitionResult.definition.autoAssignRole, toStage);
+      await prisma.workflowInstance.update({
+        where: { id: transitionResult.instanceId },
+        data: { currentAssigneeId },
+      });
+    } catch (assignErr) {
+      console.error('[workflow-engine] auto-assign failed after transition — manual remediation may be required', {
+        instanceId: transitionResult.instanceId,
+        toStage,
+        autoAssignRole: transitionResult.definition.autoAssignRole,
+        error: assignErr.message,
+      });
+    }
   }
 
   await PublishWorkflowTransitioned(taskId, transitionResult.fromStage, toStage, userId, transitionResult.isTerminal)

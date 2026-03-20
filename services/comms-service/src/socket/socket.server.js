@@ -50,6 +50,12 @@ const AttachSocket = (httpServer) => {
 
         socket.join(`chat:${chatId}`);
       } catch (err) {
+        console.error('[comms-service] join-chat failed:', {
+          socketId: socket.id,
+          room: `chat:${chatId}`,
+          error: err.message,
+          stack: err.stack,
+        });
         socket.emit('error', { message: 'Failed to join chat' });
       }
     });

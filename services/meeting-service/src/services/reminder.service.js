@@ -17,19 +17,36 @@ async function CheckReminders() {
   for (const meeting of meetings) {
     const acceptedParticipants = meeting.participants.filter((p) => p.rsvp !== 'declined');
     for (const participant of acceptedParticipants) {
+      let claimAt = null;
+      let claimed = { count: 0 };
       try {
+        // Atomic claim: only send if this instance is the first to update the row
+        claimAt = new Date();
+        claimed = await prisma.meetingParticipant.updateMany({
+          where: { meetingId: meeting.id, userId: participant.userId, reminderSentAt: null },
+          data: { reminderSentAt: claimAt },
+        });
+
+        if (claimed.count === 0) continue;
+
         await Email.SendMeetingReminder(participant.userId, {
           ...meeting,
           participantEmail: participant.email,
         });
-
-        await prisma.$transaction([
-          prisma.meetingParticipant.updateMany({
-            where: { meetingId: meeting.id, userId: participant.userId, reminderSentAt: null },
-            data: { reminderSentAt: new Date() },
-          }),
-        ]);
       } catch (err) {
+        if (claimed.count === 1 && claimAt) {
+          await prisma.meetingParticipant.updateMany({
+            where: { meetingId: meeting.id, userId: participant.userId, reminderSentAt: claimAt },
+            data: { reminderSentAt: null },
+          }).catch((rollbackErr) => {
+            console.error('[meeting-reminder] Failed to rollback reminder claim', {
+              meetingId: meeting.id,
+              userId: participant.userId,
+              error: rollbackErr.message,
+            });
+          });
+        }
+
         console.error('[meeting-reminder] Failed to send reminder', {
           meetingId: meeting.id,
           userId: participant.userId,
@@ -53,7 +70,7 @@ function StartReminderChecker() {
     }
   };
 
-  run();
+  return run();
 }
 
 module.exports = { StartReminderChecker };

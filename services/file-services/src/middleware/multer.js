@@ -25,11 +25,20 @@ const ValidateFileContent = async (req, res, next) => {
       Object.values(req.files).forEach((group) => files.push(...group));
     }
 
+    const TEXT_ALLOWED_MIME = ['text/plain', 'text/csv'];
+
     for (const file of files) {
       const detected = await fileTypeFromBuffer(file.buffer);
-      const detectedMime = detected?.mime || file.mimetype;
 
-      if (!ALLOWED_FILE_TYPES.includes(detectedMime)) {
+      if (!detected) {
+        if (!TEXT_ALLOWED_MIME.includes(file.mimetype)) {
+          return res.status(400).json({ status: 'fail', message: 'Unable to determine file content type' });
+        }
+        // text/plain and text/csv have no magic bytes; trust the FileFilter mimetype check
+        continue;
+      }
+
+      if (!ALLOWED_FILE_TYPES.includes(detected.mime)) {
         return res.status(400).json({ status: 'fail', message: 'Uploaded file content type is not allowed' });
       }
     }

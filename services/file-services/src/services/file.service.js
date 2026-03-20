@@ -11,8 +11,9 @@ const _assertCanAccessFile = (file, userId) => {
 const UploadFile = async (uploadedBy, workspaceId, entityType, entityId, file) => {
     const storagePath = await StorageService.Upload(workspaceId, entityId, file.buffer, file.originalname, file.mimetype);
 
+    let record;
     try {
-        const record = await prisma.file.create({
+        record = await prisma.file.create({
             data: {
                 uploadedBy,
                 workspaceId,
@@ -25,9 +26,12 @@ const UploadFile = async (uploadedBy, workspaceId, entityType, entityId, file) =
             },
         });
         const url = await StorageService.GetPresignedUrl(storagePath);
-        return { ...record, url };
+        return { ...record, sizeBytes: record.sizeBytes.toString(), url };
     } catch (err) {
         await StorageService.Delete(storagePath).catch(() => null);
+        if (record) {
+            await prisma.file.delete({ where: { id: record.id } }).catch(() => null);
+        }
         throw err;
     }
 };
@@ -43,12 +47,13 @@ const ListFiles = async (entityType, entityId, userId, { limit = 20, offset = 0 
     const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
     const safeOffset = Math.max(0, Number(offset) || 0);
 
-    return prisma.file.findMany({
+    const files = await prisma.file.findMany({
         where: { entityType, entityId, uploadedBy: userId, isDeleted: false },
         orderBy: { createdAt: 'desc' },
         skip: safeOffset,
         take: safeLimit,
     });
+    return files.map((f) => ({ ...f, sizeBytes: f.sizeBytes.toString() }));
 };
 
 const DeleteFile = async (fileId, userId) => {
@@ -59,9 +64,18 @@ const DeleteFile = async (fileId, userId) => {
 
     try {
         await StorageService.Delete(file.storagePath);
-    } catch (err) {
-        await prisma.file.update({ where: { id: fileId }, data: { isDeleted: false } });
-        throw err;
+    } catch (deleteErr) {
+        try {
+            await prisma.file.update({ where: { id: fileId }, data: { isDeleted: false } });
+        } catch (rollbackErr) {
+            console.error('[file-service] CRITICAL: storage delete failed and DB rollback failed — manual remediation required', {
+                fileId,
+                storagePath: file.storagePath,
+                deleteError: deleteErr.message,
+                rollbackError: rollbackErr.message,
+            });
+        }
+        throw deleteErr;
     }
 };
 

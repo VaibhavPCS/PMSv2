@@ -17,7 +17,7 @@ HandleUnhandledRejection(Server);
 
 Server.on('error', (err) => {
   Logger.error(`comms-service failed to bind: ${err.code || 'UNKNOWN'} ${err.message}`);
-  process.exit(1);
+  Logger.flush(() => process.exit(1));
 });
 
 Server.listen(PORT, () => {

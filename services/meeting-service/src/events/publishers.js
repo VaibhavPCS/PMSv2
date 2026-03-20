@@ -7,10 +7,13 @@ const getProducer = async () => {
     _producer = CreateProducer([process.env.KAFKA_BROKER]);
   }
 
+  const current = _producer;
   try {
-    return await _producer;
+    return await current;
   } catch (err) {
-    _producer = null;
+    if (_producer === current) {
+      _producer = null;
+    }
     throw err;
   }
 };
