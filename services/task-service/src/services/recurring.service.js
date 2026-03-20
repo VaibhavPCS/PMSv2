@@ -18,6 +18,16 @@ const CreateTemplate = async (userId, {
   projectId, workspaceId, title, description, priority,
   assignees, intervalDays, startDate, endDate, projectHeadId,
 }) => {
+  if (!projectId) {
+    throw new APIError(400, 'projectId is required.');
+  }
+  if (!workspaceId) {
+    throw new APIError(400, 'workspaceId is required.');
+  }
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new APIError(400, 'title is required.');
+  }
+
   if (!Array.isArray(assignees) || assignees.length === 0) {
     throw new APIError(400, 'At least one assignee is required.');
   }
@@ -129,8 +139,11 @@ const SpawnDueTasks = async () => {
           },
         });
 
-        for (const assigneeId of tpl.assignees) {
-          await tx.taskAssignee.create({ data: { taskId: task.id, userId: assigneeId } });
+        if (Array.isArray(tpl.assignees) && tpl.assignees.length > 0) {
+          await tx.taskAssignee.createMany({
+            data: tpl.assignees.map((assigneeId) => ({ taskId: task.id, userId: assigneeId })),
+            skipDuplicates: true,
+          });
         }
 
         await tx.taskHistory.create({

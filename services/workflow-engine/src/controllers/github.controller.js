@@ -67,7 +67,12 @@ const HandleGithubWebhook = CatchAsync(async (req, res) => {
     }
 
     const definition = instance.definition.definition;
-    const githubTransition = definition.transitions.find(
+    const transitions = Array.isArray(definition.transitions) ? definition.transitions : [];
+    if (!Array.isArray(definition.transitions)) {
+        logger.error(`[GITHUB_WEBHOOK] Invalid transitions payload for instance=${instance.id} task=${taskId}`);
+    }
+
+    const githubTransition = transitions.find(
         (t) => t.from === instance.currentStage && t.githubTrigger === true,
     );
 

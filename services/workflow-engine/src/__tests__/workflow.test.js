@@ -340,7 +340,8 @@ describe('PATCH /api/v1/workflows/:id — UpdateWorkflow', () => {
       .patch(`/api/v1/workflows/${WORKFLOW_ID}`)
       .send({});
 
-    expect([200, 422]).toContain(res.status);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(existing);
   });
 });
 

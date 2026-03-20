@@ -13,7 +13,8 @@ if (!process.env.DATABASE_URL) {
     process.exit(1);
   }
 
-  process.env.DATABASE_URL = `${dbBase}/${dbName}?schema=public`;
+  const normalizedBase = dbBase.replace(/\/+$/, '');
+  process.env.DATABASE_URL = `${normalizedBase}/${dbName}?schema=public`;
 }
 
 const prismaBin = process.platform === 'win32' ? 'prisma.cmd' : 'prisma';

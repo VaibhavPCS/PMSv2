@@ -206,7 +206,11 @@ describe('POST /api/v1/workflow-instances — CreateInstance', () => {
   });
 
   it('404: returns 404 when workflow definition is inactive', async () => {
-    prisma.workflowDefinition.findUnique.mockResolvedValue(null);
+    prisma.workflowDefinition.findUnique.mockResolvedValue({
+      id: WORKFLOW_DEF_ID,
+      isActive: false,
+      definition: { initialStage: 'todo' },
+    });
 
     const res = await request(app)
       .post('/api/v1/workflow-instances')

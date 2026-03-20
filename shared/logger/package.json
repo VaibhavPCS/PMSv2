@@ -5,7 +5,7 @@
     "private": true,
     "description": "",
     "scripts": {
-        "test": "echo \"No unit tests for shared package\" && exit 0"
+        "test": "echo \"No unit tests for shared package\" && exit 1"
     },
     "keywords": [],
     "author": "",

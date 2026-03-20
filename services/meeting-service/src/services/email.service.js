@@ -95,7 +95,7 @@ const SendMeetingReminder = async (userId, meeting) => {
 
   await _send({
     to:      email,
-    subject: `Reminder: "${_escapeHtml(meeting.title)}" starts in 15 minutes`,
+    subject: `Reminder: "${String(meeting.title || '').trim()}" starts in 15 minutes`,
     html: `
       <p>Hi,</p>
       <p>This is a reminder that <strong>${_escapeHtml(meeting.title)}</strong> is starting soon.</p>

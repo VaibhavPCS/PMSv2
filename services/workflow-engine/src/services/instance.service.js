@@ -11,7 +11,7 @@ const CreateInstance = async (taskId, workflowDefinitionId, createdBy) => {
   const definition = await prisma.workflowDefinition.findUnique({
     where: { id: workflowDefinitionId, isActive: true },
   });
-  if (!definition) {
+  if (!definition || definition.isActive === false) {
     throw new APIError(404, 'Workflow definition not found or inactive.');
   }
 

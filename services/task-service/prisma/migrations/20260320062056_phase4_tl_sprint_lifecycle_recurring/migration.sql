@@ -14,7 +14,7 @@ CREATE TABLE "ProjectMemberRoleCache" (
     "projectId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "role" TEXT NOT NULL,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ProjectMemberRoleCache_pkey" PRIMARY KEY ("projectId","userId")
 );
@@ -35,7 +35,7 @@ CREATE TABLE "RecurringTaskTemplate" (
     "createdBy" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "RecurringTaskTemplate_pkey" PRIMARY KEY ("id")
 );
@@ -43,6 +43,10 @@ CREATE TABLE "RecurringTaskTemplate" (
 ALTER TABLE "RecurringTaskTemplate"
 ADD CONSTRAINT "RecurringTaskTemplate_intervalDays_check"
 CHECK ("intervalDays" > 0);
+
+-- Foreign keys for projectId/workspaceId/createdBy/projectHeadId are intentionally
+-- deferred because this service uses an isolated task-service database without
+-- parent project/workspace/user tables.
 
 -- CreateIndex
 CREATE INDEX "ProjectMemberRoleCache_projectId_idx" ON "ProjectMemberRoleCache"("projectId");

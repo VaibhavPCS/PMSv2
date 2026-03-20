@@ -4,8 +4,8 @@ module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/__tests__/**/*.test.js'],
   clearMocks: true,
-  resetMocks: false,
-  restoreMocks: false,
+  resetMocks: true,
+  restoreMocks: true,
   coverageDirectory: 'coverage',
   collectCoverageFrom: ['src/**/*.js', '!src/config/**'],
 };

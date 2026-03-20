@@ -14,7 +14,7 @@ const _handleTaskEvent = async ({ value }) => {
 
     switch (value.type) {
         case 'TASK_STATUS_CHANGED':
-            if (!value.projectId || !value.taskId) {
+            if (!value.projectId || !value.taskId || !value.from || !value.to || !value.userId || !value.timestamp) {
                 logger.warn(`[TASK_STATUS_CHANGED] Skipping emit due to invalid payload projectId=${value?.projectId} taskId=${value?.taskId}`);
                 break;
             }
@@ -44,6 +44,12 @@ const StartConsumer = async () => {
             .split(',')
             .map((s) => s.trim())
             .filter(Boolean);
+
+        const env = String(process.env.NODE_ENV || '').toLowerCase();
+        const isLocalEnv = env === 'development' || env === 'test';
+        if (brokers.length === 0 && !isLocalEnv) {
+            throw new Error('KAFKA_BROKER is required outside development/test environments.');
+        }
 
         const consumer = await CreateConsumer(
             brokers.length > 0 ? brokers : ['localhost:9092'],

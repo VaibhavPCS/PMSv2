@@ -11,8 +11,12 @@ function ValidateTransition(definition, currentStage, toStage, userRole, payload
   }
 
   const allowedRoles = Array.isArray(transition.allowedRoles) ? transition.allowedRoles : [];
-  
-  if (triggeredBy !== 'github_webhook' && !allowedRoles.includes(userRole)) {
+
+  if (triggeredBy === 'github_webhook' && !transition.githubTrigger) {
+    throw new APIError(403, 'Webhook not allowed for this transition.');
+  }
+
+  if (!allowedRoles.includes(userRole)) {
     throw new APIError(403, 'Your role cannot perform this transition.');
   }
 
@@ -20,13 +24,17 @@ function ValidateTransition(definition, currentStage, toStage, userRole, payload
     throw new APIError(400, 'This transition can only be triggered by a GitHub webhook.');
   }
 
-  if (transition.requiresNote && !payload?.note?.trim()) {
+  const note = typeof payload?.note === 'string' ? payload.note.trim() : '';
+  const attachmentUrl = typeof payload?.attachmentUrl === 'string' ? payload.attachmentUrl.trim() : '';
+  const referenceLink = typeof payload?.referenceLink === 'string' ? payload.referenceLink.trim() : '';
+
+  if (transition.requiresNote && !note) {
     throw new APIError(400, 'A note is required for this transition.');
   }
-  if (transition.requiresAttachment && !payload?.attachmentUrl?.trim()) {
+  if (transition.requiresAttachment && !attachmentUrl) {
     throw new APIError(400, 'An attachment is required for this transition.');
   }
-  if (transition.requiresReferenceLink && !payload?.referenceLink?.trim()) {
+  if (transition.requiresReferenceLink && !referenceLink) {
     throw new APIError(400, 'A reference link is required for this transition.');
   }
 

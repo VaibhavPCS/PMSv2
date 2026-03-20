@@ -289,7 +289,10 @@ describe('Message Controller', () => {
   describe('PATCH /api/v1/messages/:id', () => {
     it('edits a message and returns the updated content', async () => {
       prisma.message.findUnique.mockResolvedValue(makeMessage());
-      prisma.message.update.mockResolvedValue(makeMessage({ isEdited: true }));
+      prisma.message.update.mockResolvedValue(makeMessage({
+        isEdited: true,
+        content: Buffer.from('updated content').toString('base64'),
+      }));
 
       const res = await request(App)
         .patch(`${MSG_BASE}/${MSG_ID}`)

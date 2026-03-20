@@ -17,6 +17,8 @@ const SIMPLE_DEFINITION = {
   stages: [
     { id: 'todo',        label: 'Todo'        },
     { id: 'in-progress', label: 'In Progress' },
+    { id: 'review',      label: 'Review'      },
+    { id: 'deployed',    label: 'Deployed'    },
     { id: 'done',        label: 'Done'        },
   ],
   transitions: [

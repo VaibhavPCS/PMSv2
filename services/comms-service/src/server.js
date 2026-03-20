@@ -14,6 +14,19 @@ const Server = http.createServer(App);
 const io     = AttachSocket(Server);
 App.set('io', io);
 
+Server.on('error', (err) => {
+  Logger.error('comms-service failed to bind HTTP server', {
+    code: err.code,
+    message: err.message,
+    port: PORT,
+  });
+  try {
+    Server.close(() => process.exit(1));
+  } catch {
+    process.exit(1);
+  }
+});
+
 Server.listen(PORT, () => {
   Logger.info(`comms-service running on port ${PORT}`);
   SetIo(io);

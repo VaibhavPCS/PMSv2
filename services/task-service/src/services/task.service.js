@@ -69,7 +69,8 @@ const _publishStatusChangedWithRetry = async (taskId, projectId, from, to, userI
         }
     }
 
-    throw lastError;
+    logger.error(`[TASK_STATUS_PUBLISH_GIVEUP] taskId=${taskId} projectId=${projectId} from=${from} to=${to} userId=${userId} error=${lastError?.message}`);
+    return;
 };
 
 const _isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
@@ -238,7 +239,7 @@ const ApproveTask = async (taskId, { comment }, userId) => {
 const RejectTask = async (taskId, { reason, rejectTo }, userId) => {
     _validateUserTarget(rejectTo, 'rejectTo');
 
-    const {previousStatus, projectId} = await prisma.$transaction(async (tx) => {
+    const { updatedTask, previousStatus, projectId } = await prisma.$transaction(async (tx) => {
         const task = await tx.task.findUnique({ where: { id: taskId }, include: { assignees: true } });
         if (!task || !task.isActive) throw new APIError(404, 'Task not found.');
 
@@ -279,12 +280,13 @@ const RejectTask = async (taskId, { reason, rejectTo }, userId) => {
             },
         });
 
-        return { previousStatus: task.status, projectId: task.projectId };
+        const refreshed = await tx.task.findUnique({ where: { id: taskId }, include: { assignees: true } });
+        return { updatedTask: refreshed, previousStatus: task.status, projectId: task.projectId };
     });
 
     await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.REJECTED, userId);
 
-    return prisma.task.findUnique({ where: { id: taskId }, include: { assignees: true } });
+    return updatedTask;
 };
 
 const HandoverTask = async (taskId, { notes, handoverTo }, userId) => {
@@ -326,11 +328,14 @@ const HandoverTask = async (taskId, { notes, handoverTo }, userId) => {
 };
 
 const DeleteTask = async (taskId, userId) => {
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || !task.isActive) throw new APIError(404, 'Task not found.');
-    if (task.createdBy !== userId) throw new APIError(403, 'Only the task creator can delete this task.');
+    await prisma.$transaction(async (tx) => {
+        const task = await tx.task.findUnique({ where: { id: taskId } });
+        if (!task || !task.isActive) throw new APIError(404, 'Task not found.');
+        if (task.createdBy !== userId) throw new APIError(403, 'Only the task creator can delete this task.');
 
-    await prisma.task.update({ where: { id: taskId }, data: { isActive: false } });
+        await tx.task.update({ where: { id: taskId }, data: { isActive: false } });
+    });
+
     await PublishTaskDeleted(taskId);
 };
 

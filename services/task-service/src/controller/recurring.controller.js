@@ -23,7 +23,12 @@ const GetTemplates = CatchAsync(async (req, res) => {
 
 const DeleteTemplate = CatchAsync(async (req, res) => {
   const userId = req.session.getUserId();
-  await RecurringService.DeleteTemplate(req.params.id, userId);
+  const id = String(req.params.id || '');
+  if (!_UUID_REGEX.test(id)) {
+    throw new APIError(400, 'Template id must be a valid UUID.');
+  }
+
+  await RecurringService.DeleteTemplate(id, userId);
   res.status(204).send();
 });
 

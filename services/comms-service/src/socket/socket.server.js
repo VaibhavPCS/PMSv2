@@ -31,6 +31,8 @@ const AttachSocket = (httpServer) => {
     });
 
     io.on('connection', (socket) => {
+        const _isValidProjectId = (projectId) => typeof projectId === 'string' && projectId.trim().length > 0;
+
         socket.on('join-chat', async (chatId) => {
             try {
                 if (typeof chatId !== 'string' || !chatId.trim()) {
@@ -63,12 +65,42 @@ const AttachSocket = (httpServer) => {
             socket.leave(`chat:${chatId}`);
         });
 
-        socket.on('join-project', (projectId) => {
-            socket.join(`project:${projectId}`);
+        socket.on('join-project', async (projectId) => {
+            try {
+                if (!_isValidProjectId(projectId) || !socket.userId) {
+                    socket.emit('permission-denied', { projectId, reason: 'invalid-request' });
+                    return;
+                }
+
+                socket.join(`project:${projectId}`);
+            } catch (err) {
+                console.error('[comms-service] join-project failed:', {
+                    socketId: socket.id,
+                    projectId,
+                    error: err.message,
+                    stack: err.stack,
+                });
+                socket.emit('permission-denied', { projectId, reason: 'join-failed' });
+            }
         });
 
-        socket.on('leave-project', (projectId) => {
-            socket.leave(`project:${projectId}`);
+        socket.on('leave-project', async (projectId) => {
+            try {
+                if (!_isValidProjectId(projectId) || !socket.userId) {
+                    socket.emit('permission-denied', { projectId, reason: 'invalid-request' });
+                    return;
+                }
+
+                socket.leave(`project:${projectId}`);
+            } catch (err) {
+                console.error('[comms-service] leave-project failed:', {
+                    socketId: socket.id,
+                    projectId,
+                    error: err.message,
+                    stack: err.stack,
+                });
+                socket.emit('permission-denied', { projectId, reason: 'leave-failed' });
+            }
         });
 
         socket.on('typing', ({ chatId, typing }) => {

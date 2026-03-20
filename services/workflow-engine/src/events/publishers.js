@@ -1,8 +1,10 @@
 const { CreateProducer, PublishEvent } = require('@pms/kafka');
 const { TOPICS } = require('@pms/constants');
 const { CreateLogger } = require('@pms/logger');
+const crypto = require('crypto');
 
 const logger = CreateLogger('workflow-engine:publishers');
+const MAX_AUTO_ASSIGN_ATTEMPTS = Number(process.env.WORKFLOW_AUTO_ASSIGN_MAX_ATTEMPTS || 3);
 
 let _producer = null;
 const getProducer = async () => {
@@ -56,7 +58,7 @@ const PublishWorkflowAutoAssignFailed = async ({
 }) => {
     const producer = await getProducer();
     const timestamp = new Date().toISOString();
-    const eventKey = instanceId || taskId;
+    const eventKey = instanceId || taskId || crypto.randomUUID();
 
     if (errorStack) {
         logger.error('[WORKFLOW_AUTO_ASSIGN_FAILED]', {
@@ -84,18 +86,20 @@ const PublishWorkflowAutoAssignFailed = async ({
     });
 
     const retryTopic = process.env.WORKFLOW_ASSIGNMENT_RETRY_TOPIC || 'pms.workflow.assignment.retry';
-    await PublishEvent(producer, retryTopic, eventKey, {
-        type: 'WORKFLOW_AUTO_ASSIGN_RETRY_REQUESTED',
-        taskId,
-        instanceId,
-        toStage,
-        autoAssignRole,
-        triggeredBy,
-        attempt,
-        failedAt,
-        errorMessage,
-        timestamp,
-    });
+    if ((attempt || 0) < MAX_AUTO_ASSIGN_ATTEMPTS) {
+        await PublishEvent(producer, retryTopic, eventKey, {
+            type: 'WORKFLOW_AUTO_ASSIGN_RETRY_REQUESTED',
+            taskId,
+            instanceId,
+            toStage,
+            autoAssignRole,
+            triggeredBy,
+            attempt,
+            failedAt,
+            errorMessage,
+            timestamp,
+        });
+    }
 };
 
 module.exports = {

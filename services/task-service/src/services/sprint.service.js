@@ -171,29 +171,46 @@ const DeleteSprint = async (sprintId, userId) => {
 
 const StartSprint = async (sprintId, userId) => {
     _requireAuthenticatedUser(userId);
-    const sprint = await _fetchSprint(sprintId);
+    const now = new Date();
 
-    if (sprint.status !== 'planned') {
-        throw new APIError(400, `Sprint is already '${sprint.status}'. Only planned sprints can be started.`);
-    }
+    const result = await prisma.$transaction(async (tx) => {
+        const sprint = await tx.sprint.findUnique({ where: { id: sprintId } });
+        if (!sprint || !sprint.isActive) {
+            throw new APIError(404, 'Sprint not found.');
+        }
+        if (sprint.status !== 'planned') {
+            throw new APIError(400, `Sprint is already '${sprint.status}'. Only planned sprints can be started.`);
+        }
 
-    return prisma.sprint.update({
-        where: { id: sprintId },
-        data: { status: 'active', startedAt: new Date() },
+        const updated = await tx.sprint.updateMany({
+            where: { id: sprintId, isActive: true, status: 'planned' },
+            data: { status: 'active', startedAt: now },
+        });
+
+        if (updated.count !== 1) {
+            throw new APIError(400, 'Sprint can no longer be started. Please refresh and retry.');
+        }
+
+        return tx.sprint.findUnique({ where: { id: sprintId } });
     });
+
+    return result;
 };
 
 const CloseSprint = async (sprintId, userId, { carryOverSprintId } = {}) => {
     _requireAuthenticatedUser(userId);
-    const sprint = await _fetchSprint(sprintId);
-
-    if (sprint.status !== 'active') {
-        throw new APIError(400, `Sprint is '${sprint.status}'. Only active sprints can be closed.`);
-    }
 
     const INCOMPLETE_STATUSES = ['pending', 'in_progress', 'on_hold', 'in_review', 'rejected'];
 
     return prisma.$transaction(async (tx) => {
+        const sprint = await tx.sprint.findUnique({ where: { id: sprintId } });
+        if (!sprint || !sprint.isActive) {
+            throw new APIError(404, 'Sprint not found.');
+        }
+        if (sprint.status !== 'active') {
+            throw new APIError(400, `Sprint is '${sprint.status}'. Only active sprints can be closed.`);
+        }
+
         if (carryOverSprintId) {
             const target = await tx.sprint.findUnique({ where: { id: carryOverSprintId } });
             if (!target || !target.isActive || target.status === 'closed' || target.projectId !== sprint.projectId) {
