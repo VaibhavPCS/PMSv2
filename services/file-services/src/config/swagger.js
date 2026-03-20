@@ -84,7 +84,10 @@ const definition = {
           { in: 'query', name: 'entityId', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
         responses: {
-          200: { description: 'Array of file metadata objects' },
+          200: {
+            description: 'Array of file metadata objects',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/File' } } } },
+          },
           401: { $ref: '#/components/responses/Unauthorized' },
         },
       },

@@ -267,11 +267,10 @@ const definition = {
         tags: ['Messages'],
         summary: 'Remove an emoji reaction from a message',
         security: [{ cookieAuth: [] }],
-        parameters: [{ in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } }],
-        requestBody: {
-          required: true,
-          content: { 'application/json': { schema: { type: 'object', required: ['emoji'], properties: { emoji: { type: 'string', example: '👍' } } } } },
-        },
+        parameters: [
+          { in: 'path', name: 'id', required: true, schema: { type: 'string', format: 'uuid' } },
+          { in: 'query', name: 'emoji', required: true, schema: { type: 'string' }, example: '👍' },
+        ],
         responses: {
           200: { description: 'Reaction removed' },
           401: { $ref: '#/components/responses/Unauthorized' },

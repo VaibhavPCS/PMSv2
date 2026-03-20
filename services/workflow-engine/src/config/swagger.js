@@ -1,5 +1,4 @@
 const SwaggerJsdoc = require('swagger-jsdoc');
-const path = require('path');
 
 const definition = {
   openapi: '3.0.0',
@@ -8,7 +7,7 @@ const definition = {
     version: '1.0.0',
     description: 'Manages workflow definitions and task stage transitions. Owns `pms_workflow` database.\n\nA **WorkflowDefinition** is a JSON blueprint of stages and transitions. A **WorkflowInstance** is created per-task when a workflow is started, and advances through stages via the transition endpoint.',
   },
-  servers: [{ url: 'http://localhost:4006', description: 'Local development' }],
+  servers: [{ url: process.env.API_DOMAIN || 'http://localhost:4006', description: 'Local development' }],
   tags: [
     { name: 'Workflow Definitions', description: 'Create and manage reusable workflow blueprints' },
     { name: 'Workflow Instances', description: 'Per-task workflow instances and stage transitions' },

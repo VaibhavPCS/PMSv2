@@ -8,9 +8,12 @@ const { middleware, errorHandler } = require('supertokens-node/framework/express
 const { InitAuth } = require('@pms/auth-middleware');
 const { ErrorHandler, NotFoundHandler } = require('@pms/error-handler');
 
+const { CreateLogger } = require('@pms/logger');
 const prisma = require('./config/prisma');
 const AuthService = require('./services/auth.service');
 const AuthRoutes = require('./routes/auth.routes');
+
+const _logger = CreateLogger('auth-service:session');
 
 const SessionConfig = {
 	override: {
@@ -21,7 +24,9 @@ const SessionConfig = {
 				try {
 					const user = await prisma.user.findUnique({ where: { id: input.userId } });
 					if (user) role = user.role;
-				} catch (_) { }
+				} catch (err) {
+					_logger.error('createNewSession — DB lookup failed, defaulting role to member', { userId: input.userId, error: err.message });
+				}
 				return originalImplementation.createNewSession({
 					...input,
 					accessTokenPayload: { ...input.accessTokenPayload, role },

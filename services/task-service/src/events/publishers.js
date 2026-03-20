@@ -51,6 +51,13 @@ const PublishTaskStatusChanged = async (taskId, projectId, from, to, userId) => 
     });
 };
 
+const _serializeError = (err) => {
+    if (!err) return 'unknown';
+    if (err instanceof Error) return { message: err.message, name: err.name, stack: err.stack };
+    if (typeof err === 'string') return err;
+    return String(err);
+};
+
 const PublishTaskStatusChangedDLQ = async ({ taskId, projectId, from, to, userId, error }) => {
     const producer = await _getProducer();
     const dlqTopic = process.env.TASK_STATUS_DLQ_TOPIC || 'pms.task.status.dlq';
@@ -62,7 +69,7 @@ const PublishTaskStatusChangedDLQ = async ({ taskId, projectId, from, to, userId
         from,
         to,
         userId,
-        error: error || 'unknown',
+        error: _serializeError(error),
         timestamp: new Date().toISOString(),
     });
 };

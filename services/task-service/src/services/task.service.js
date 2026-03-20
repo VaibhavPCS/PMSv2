@@ -224,7 +224,7 @@ const UpdateStatus = async (taskId, { status, reason }, userId) => {
 
     const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, status, userId);
     if (!publishResult.success) {
-        throw new APIError(502, `Task status updated but event publish failed: ${publishResult.reason}`);
+        logger.warn(`UpdateStatus — DB committed, event publish failed: ${publishResult.reason}`, { taskId });
     }
     return updated;
 };
@@ -251,7 +251,7 @@ const ApproveTask = async (taskId, { comment }, userId) => {
 
     const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.APPROVED, userId);
     if (!publishResult.success) {
-        throw new APIError(502, `Task approval updated but event publish failed: ${publishResult.reason}`);
+        logger.warn(`ApproveTask — DB committed, event publish failed: ${publishResult.reason}`, { taskId });
     }
     return updated;
 };
@@ -306,7 +306,7 @@ const RejectTask = async (taskId, { reason, rejectTo }, userId) => {
 
     const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.REJECTED, userId);
     if (!publishResult.success) {
-        throw new APIError(502, `Task rejection updated but event publish failed: ${publishResult.reason}`);
+        logger.warn(`RejectTask — DB committed, event publish failed: ${publishResult.reason}`, { taskId });
     }
 
     return updatedTask;
@@ -348,7 +348,7 @@ const HandoverTask = async (taskId, { notes, handoverTo }, userId) => {
 
     const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.IN_REVIEW, userId);
     if (!publishResult.success) {
-        throw new APIError(502, `Task handover updated but event publish failed: ${publishResult.reason}`);
+        logger.warn(`HandoverTask — DB committed, event publish failed: ${publishResult.reason}`, { taskId });
     }
     return updated;
 };

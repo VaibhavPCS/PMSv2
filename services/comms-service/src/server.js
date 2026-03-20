@@ -25,12 +25,13 @@ Server.on('error', (err) => {
     process.exit(1);
   }, 5000);
 
-  try {
-    Server.close(() => {
+  if (Server.listening) {
+    Server.close((err) => {
       clearTimeout(forceExitTimer);
+      if (err) Logger.error('Error while closing HTTP server', { message: err.message });
       process.exit(1);
     });
-  } catch {
+  } else {
     clearTimeout(forceExitTimer);
     process.exit(1);
   }

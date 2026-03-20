@@ -38,10 +38,13 @@ const SetActiveWorkspace = async (id, workspaceId) => {
   });
 };
 
+// Role is validated upstream via UpdateRoleSchema (z.enum) in auth.routes.js before this is called.
 const UpdateUserRole = async (id, role) => {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new APIError(404, 'User not found.');
-  return prisma.user.update({ where: { id }, data: { role } });
+  const updated = await prisma.user.update({ where: { id }, data: { role } });
+  await PublishUserUpdated(id, { role });
+  return updated;
 };
 
 module.exports = {
