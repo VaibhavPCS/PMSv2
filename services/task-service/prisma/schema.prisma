@@ -8,34 +8,33 @@ generator client {
 }
 
 model Task {
-  id          String   @id @default(uuid())
-  projectId   String                            // plain UUID — never cross-query pms_project
-  workspaceId String                            // for workspace-scoped queries
-  title       String
-  description String?
-  status      String   @default("pending")      // TASK_STATUS values
-  priority    String                            // PRIORITY_LEVELS values
-  dueDate     DateTime
-  sprintId    String?                           // optional — links to Sprint.id
-  parentTask  String?                           // optional — subtask (self-ref by id)
-  createdBy     String                          // userId
-  projectHeadId String?                         // denormalized — updated via PROJECT_HEAD_CHANGED event
-  cycleCount  Int      @default(0)              // incremented on every rejection cycle
-  isFlagged   Boolean  @default(false)          // true when sprint expired — all ops frozen
-  flagReason  String?                           // discriminator for why the task was flagged
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  projectId     String
+  workspaceId   String
+  title         String
+  description   String?
+  status        String   @default("pending")
+  priority      String
+  dueDate       DateTime
+  sprintId      String?
+  parentTask    String?
+  createdBy     String
+  projectHeadId String?
+  cycleCount    Int      @default(0)
+  isFlagged     Boolean  @default(false)
+  flagReason    String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  assignees   TaskAssignee[]
-  history     TaskHistory[]
+  assignees TaskAssignee[]
+  history   TaskHistory[]
 
   @@index([projectId])
   @@index([sprintId])
   @@index([status])
   @@index([workspaceId])
   @@index([isFlagged])
-  @@index([projectId, status])
 }
 
 model TaskAssignee {
@@ -43,7 +42,7 @@ model TaskAssignee {
   taskId String
   userId String
 
-  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, userId])
   @@index([userId])
@@ -53,35 +52,74 @@ model TaskHistory {
   id        String   @id @default(uuid())
   taskId    String
   userId    String
-  action    String                              // created | status_changed | approved | rejected | in_review | flagged
-  fromValue String?                             // previous status
-  toValue   String?                             // new status
-  note      String?                             // rejection reason, review notes, etc.
+  action    String
+  fromValue String?
+  toValue   String?
+  note      String?
   createdAt DateTime @default(now())
 
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
 }
 
 model Sprint {
-  id        String   @id @default(uuid())
-  projectId String                              // plain UUID — never cross-query pms_project
+  id        String    @id @default(uuid())
+  projectId String
   name      String
   goal      String?
+  status    String    @default("planned")   // planned | active | closed
   startDate DateTime
   endDate   DateTime
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  startedAt DateTime?
+  closedAt  DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([projectId])
+  @@index([status])
 }
 
-// Local read model — populated via PROJECT_DEADLINE_EXTENDED Kafka events.
-// sprint.service.js validates sprint endDate <= project endDate using this cache.
+// Local read model — populated via PROJECT_DEADLINE_EXTENDED events.
 model ProjectEndDateCache {
   projectId String   @id
   endDate   DateTime
   updatedAt DateTime @updatedAt
+}
+
+// Local read model — populated via PROJECT_MEMBER_ADDED / PROJECT_MEMBER_ROLE_CHANGED events.
+// Used by CreateTask to enforce that TL users can only create subtasks.
+model ProjectMemberRoleCache {
+  projectId String
+  userId    String
+  role      String
+  updatedAt DateTime @updatedAt
+
+  @@id([projectId, userId])
+  @@index([projectId])
+}
+
+// Blueprint for tasks that repeat on a fixed interval.
+// The recurring scheduler creates a new Task from this template every intervalDays.
+model RecurringTaskTemplate {
+  id            String    @id @default(uuid())
+  projectId     String
+  workspaceId   String
+  title         String
+  description   String?
+  priority      String
+  assignees     String[]
+  intervalDays  Int
+  nextDueDate   DateTime
+  endDate       DateTime?
+  projectHeadId String?
+  createdBy     String
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([nextDueDate])
+  @@index([isActive])
 }

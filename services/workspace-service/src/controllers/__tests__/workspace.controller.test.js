@@ -19,11 +19,16 @@ jest.mock('@pms/auth-middleware', () => ({
 }));
 
 jest.mock('@pms/validators', () => ({
-  ValidateRequest:        () => (req, res, next) => next(),
-  CreateWorkspaceSchema:  {},
-  UpdateWorkspaceSchema:  {},
-  InviteMemberSchema:     {},
-  AcceptInviteSchema:     {},
+  ValidateRequest:         () => (req, res, next) => next(),
+  ValidateQuery:           () => (req, res, next) => next(),
+  PaginationSchema:        {},
+  CreateWorkspaceSchema:   {},
+  UpdateWorkspaceSchema:   {},
+  TransferOwnershipSchema: {},
+  InviteMemberSchema:      {},
+  AcceptInviteSchema:      {},
+  ChangeRoleBodySchema:    {},
+  RevokeInviteSchema:      {},
 }));
 
 jest.mock('../../services/workspace.service');

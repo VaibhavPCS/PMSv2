@@ -73,4 +73,4 @@ function StartReminderChecker() {
   return run();
 }
 
-module.exports = { StartReminderChecker };
+module.exports = { CheckReminders, StartReminderChecker };

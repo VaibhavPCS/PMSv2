@@ -1,8 +1,11 @@
 const prisma = require('../config/prisma');
 const { APIError } = require('@pms/error-handler');
+const { CreateLogger } = require('@pms/logger');
 const { ValidateTransition } = require('../engine/transition-validator');
 const { AutoAssign } = require('../engine/auto-assignment');
-const { PublishWorkflowTransitioned } = require('../events/publishers');
+const { PublishWorkflowTransitioned, PublishWorkflowAutoAssignFailed } = require('../events/publishers');
+
+const logger = CreateLogger('workflow-engine:instance-service');
 
 const CreateInstance = async (taskId, workflowDefinitionId, createdBy) => {
   const definition = await prisma.workflowDefinition.findUnique({
@@ -119,17 +122,41 @@ const TransitionStage = async (taskId, { toStage, note, attachmentUrl, reference
         data: { currentAssigneeId },
       });
     } catch (assignErr) {
-      console.error('[workflow-engine] auto-assign failed after transition — manual remediation may be required', {
+      const failurePayload = {
+        taskId,
         instanceId: transitionResult.instanceId,
         toStage,
         autoAssignRole: transitionResult.definition.autoAssignRole,
-        error: assignErr.message,
-      });
+        triggeredBy,
+        attempt: 1,
+        failedAt: new Date().toISOString(),
+        errorMessage: assignErr.message,
+        errorStack: assignErr.stack,
+      };
+
+      logger.error('workflow auto-assign failed after transition; queued for remediation', failurePayload);
+
+      try {
+        await PublishWorkflowAutoAssignFailed(failurePayload);
+      } catch (publishErr) {
+        logger.error('failed to publish workflow auto-assign remediation payload', {
+          ...failurePayload,
+          publishErrorMessage: publishErr.message,
+          publishErrorStack: publishErr.stack,
+        });
+      }
     }
   }
 
   await PublishWorkflowTransitioned(taskId, transitionResult.fromStage, toStage, userId, transitionResult.isTerminal)
-    .catch((err) => console.error('[workflow-engine] failed to publish transition event', { taskId, fromStage: transitionResult.fromStage, toStage, userId, error: err.message }));
+    .catch((err) => logger.error('failed to publish transition event', {
+      taskId,
+      fromStage: transitionResult.fromStage,
+      toStage,
+      userId,
+      errorMessage: err.message,
+      errorStack: err.stack,
+    }));
 
   return GetInstance(taskId);
 };

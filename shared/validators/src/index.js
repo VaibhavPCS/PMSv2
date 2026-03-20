@@ -271,6 +271,23 @@ const ValidateRequest = (schema) => {
   };
 };
 
+const ValidateParams = (schema) => {
+  return (req, res, next) => {
+    const result = schema.safeParse(req.params);
+    if (!result.success) {
+      const errors = result.error.issues.map(
+        (e) => `${e.path.join('.')}: ${e.message}`
+      );
+      return res.status(422).json({
+        status: 'fail',
+        message: `Validation failed. ${errors.join('. ')}`,
+      });
+    }
+    req.params = result.data;
+    next();
+  };
+};
+
 const ValidateQuery = (schema) => {
   return (req, res, next) => {
     const result = schema.safeParse(req.query);
@@ -302,6 +319,7 @@ const parsePagination = ({ page = 1, limit = 20 } = {}) => ({
 
 module.exports = {
   ValidateRequest,
+  ValidateParams,
   ValidateQuery,
   parsePagination,
   PaginationSchema,

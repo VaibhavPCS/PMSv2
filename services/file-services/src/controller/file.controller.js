@@ -1,7 +1,8 @@
 const { CatchAsync, APIError } = require('@pms/error-handler');
 const FileService = require('../services/file.service');
 
-const MAX_LIMIT = Number(process.env.FILE_LIST_MAX_LIMIT) || 100;
+const parsedMaxLimit = Number.parseInt(process.env.FILE_LIST_MAX_LIMIT || '', 10);
+const MAX_LIMIT = Number.isInteger(parsedMaxLimit) && parsedMaxLimit > 0 ? parsedMaxLimit : 100;
 
 const UploadFile = CatchAsync(async (req, res) => {
     if (!req.file) throw new APIError(400, 'No file uploaded');

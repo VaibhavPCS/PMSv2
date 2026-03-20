@@ -9,10 +9,11 @@
     "test":         "jest",
     "test:watch":   "jest --watch",
     "test:coverage":"jest --coverage",
-    "db:migrate":   "npx prisma migrate dev",
-    "db:deploy":    "npx prisma migrate deploy",
-    "db:studio":    "npx prisma studio",
-    "db:generate":  "npx prisma generate"
+    "prisma":       "node ./scripts/run-prisma.js",
+    "db:migrate":   "node ./scripts/run-prisma.js migrate dev",
+    "db:deploy":    "node ./scripts/run-prisma.js migrate deploy",
+    "db:studio":    "node ./scripts/run-prisma.js studio",
+    "db:generate":  "node ./scripts/run-prisma.js generate"
   },
   "dependencies": {
     "@pms/auth-middleware":  "^1.0.0",

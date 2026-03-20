@@ -1,23 +1,14 @@
-const Express = require('express');
-const Cors = require('cors');
-const Helmet = require('helmet');
-const RateLimit = require('express-rate-limit');
-const SuperTokens = require('supertokens-node');
+const Express      = require('express');
+const Cors         = require('cors');
+const Helmet       = require('helmet');
+const RateLimit    = require('express-rate-limit');
+const SuperTokens  = require('supertokens-node');
 const { middleware, errorHandler } = require('supertokens-node/framework/express');
 const { InitAuth } = require('@pms/auth-middleware');
 const { ErrorHandler, NotFoundHandler } = require('@pms/error-handler');
 const WorkflowRoutes = require('./routes/workflow.routes');
 const InstanceRoutes = require('./routes/instance.routes');
-
-const EnsureEnv = (...keys) => {
-  keys.forEach((key) => {
-    if (!process.env[key] || !process.env[key].trim()) {
-      throw new Error(`Missing required env var: ${key}`);
-    }
-  });
-};
-
-EnsureEnv('SUPERTOKENS_CONNECTION_URI', 'SUPERTOKENS_API_KEY', 'API_DOMAIN', 'WEBSITE_DOMAIN');
+const GithubWebhookRoute = require('./routes/github.routes');
 
 InitAuth({
   connectionURI:        process.env.SUPERTOKENS_CONNECTION_URI,
@@ -36,19 +27,18 @@ App.use(Cors({
   credentials:    true,
   allowedHeaders: ['content-type', ...SuperTokens.getAllCORSHeaders()],
 }));
+
+App.use('/webhooks', Express.raw({ type: 'application/json' }), GithubWebhookRoute);
+
 App.use(Express.json());
 App.use(middleware());
 
 if (process.env.NODE_ENV !== 'production') {
   const SwaggerUi   = require('swagger-ui-express');
   const SwaggerSpec = require('./config/swagger');
-
   App.use(
     '/api/v1/workflows/docs',
-    (_req, res, next) => {
-      res.setHeader('Content-Security-Policy', '');
-      next();
-    },
+    (_req, res, next) => { res.setHeader('Content-Security-Policy', ''); next(); },
     SwaggerUi.serve,
     SwaggerUi.setup(SwaggerSpec, { customSiteTitle: 'PMS — Workflow Engine API' }),
   );

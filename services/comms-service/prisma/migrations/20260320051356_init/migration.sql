@@ -75,6 +75,9 @@ CREATE INDEX "messages_chatId_createdAt_idx" ON "messages"("chatId", "createdAt"
 -- CreateIndex
 CREATE UNIQUE INDEX "message_reactions_messageId_userId_emoji_key" ON "message_reactions"("messageId", "userId", "emoji");
 
+-- CreateIndex
+CREATE INDEX "message_reads_userid_idx" ON "message_reads"("userId");
+
 -- AddForeignKey
 ALTER TABLE "chat_participants" ADD CONSTRAINT "chat_participants_chatId_fkey" FOREIGN KEY ("chatId") REFERENCES "chats"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

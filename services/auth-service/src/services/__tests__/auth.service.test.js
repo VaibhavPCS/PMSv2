@@ -1,3 +1,9 @@
+// Prevent real Kafka connections from keeping the process alive after tests
+jest.mock('../../events/publishers', () => ({
+  PublishUserRegistered: jest.fn().mockResolvedValue(undefined),
+  PublishUserUpdated:    jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../../config/prisma', () => ({
   user: {
     create:     jest.fn(),
