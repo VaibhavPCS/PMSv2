@@ -14,8 +14,11 @@ const verifyGithubSignature = (req, _res, next) => {
 		return next(new APIError(401, 'Missing x-hub-signature-256 header.'));
 	}
 
-	const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
-	const expected = `sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`;
+	if (!Buffer.isBuffer(req.rawBody)) {
+		return next(new APIError(401, 'Missing raw webhook payload for signature verification.'));
+	}
+
+	const expected = `sha256=${crypto.createHmac('sha256', secret).update(req.rawBody).digest('hex')}`;
 	const a = Buffer.from(expected);
 	const b = Buffer.from(signatureHeader);
 	if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
@@ -25,6 +28,9 @@ const verifyGithubSignature = (req, _res, next) => {
 	next();
 };
 
-Router.post('/github', verifyGithubSignature, HandleGithubWebhook);
+Router.post('/github', (req, _res, next) => {
+	req.rawBody = Buffer.isBuffer(req.body) ? req.body : null;
+	next();
+}, verifyGithubSignature, HandleGithubWebhook);
 
 module.exports = Router;

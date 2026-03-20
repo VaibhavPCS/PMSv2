@@ -67,7 +67,6 @@ const StartConsumer = async () => {
         logger.info('Kafka consumers started — listening to TASK_EVENTS');
     } catch (err) {
         logger.error(`Failed to start Kafka consumers: ${err.message}`);
-        throw err;
     }
 };
 

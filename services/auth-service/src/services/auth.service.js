@@ -38,10 +38,17 @@ const SetActiveWorkspace = async (id, workspaceId) => {
   });
 };
 
+const UpdateUserRole = async (id, role) => {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) throw new APIError(404, 'User not found.');
+  return prisma.user.update({ where: { id }, data: { role } });
+};
+
 module.exports = {
   CreateUser,
   GetUserById,
   UpdateUser,
   SetLastLogin,
   SetActiveWorkspace,
+  UpdateUserRole,
 };

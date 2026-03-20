@@ -51,6 +51,22 @@ const PublishTaskStatusChanged = async (taskId, projectId, from, to, userId) => 
     });
 };
 
+const PublishTaskStatusChangedDLQ = async ({ taskId, projectId, from, to, userId, error }) => {
+    const producer = await _getProducer();
+    const dlqTopic = process.env.TASK_STATUS_DLQ_TOPIC || 'pms.task.status.dlq';
+
+    await PublishEvent(producer, dlqTopic, taskId, {
+        type: 'TASK_STATUS_CHANGED_DLQ',
+        taskId,
+        projectId,
+        from,
+        to,
+        userId,
+        error: error || 'unknown',
+        timestamp: new Date().toISOString(),
+    });
+};
+
 const PublishTaskDeleted = async (taskId) => {
     const producer = await _getProducer();
     await PublishEvent(producer, TOPICS.TASK_EVENTS, taskId, {
@@ -82,6 +98,7 @@ const PublishSprintDeleted = async (sprintId) => {
 module.exports = {
     PublishTaskCreated,
     PublishTaskStatusChanged,
+    PublishTaskStatusChangedDLQ,
     PublishTaskDeleted,
     PublishSprintCreated,
     PublishSprintDeleted,

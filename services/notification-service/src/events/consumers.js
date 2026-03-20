@@ -36,7 +36,6 @@ const StartConsumers = async () => {
     return consumer;
   } catch (err) {
     console.error('[notification-service] Failed to initialize Kafka consumer:', err.message);
-    throw err;
   }
 };
 

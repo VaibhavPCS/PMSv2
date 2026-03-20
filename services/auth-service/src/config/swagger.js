@@ -38,6 +38,7 @@ const definition = {
           id:              { type: 'string', example: 'a1b2c3d4-e5f6-...' },
           name:            { type: 'string', example: 'Vaibhav Sharma' },
           email:           { type: 'string', format: 'email', example: 'vaibhav@example.com' },
+          role:            { type: 'string', enum: ['super_admin', 'admin', 'project_head', 'team_lead', 'member'], example: 'member' },
           profilePicture:  { type: 'string', nullable: true, example: 'https://cdn.example.com/avatar.png' },
           activeWorkspace: { type: 'string', nullable: true, example: 'ws-uuid-here' },
           lastLogin:       { type: 'string', format: 'date-time', nullable: true },
@@ -68,6 +69,15 @@ const definition = {
           'application/json': {
             schema: { $ref: '#/components/schemas/ErrorResponse' },
             example: { status: 'fail', message: 'Session invalid. Please log in again.' },
+          },
+        },
+      },
+      Forbidden: {
+        description: 'Insufficient role — caller does not have permission',
+        content: {
+          'application/json': {
+            schema: { $ref: '#/components/schemas/ErrorResponse' },
+            example: { status: 'fail', message: 'You do not have permission to perform this action.' },
           },
         },
       },

@@ -6,6 +6,7 @@ const { parsePagination } = require('@pms/validators');
 const {
     PublishTaskCreated,
     PublishTaskStatusChanged,
+    PublishTaskStatusChangedDLQ,
     PublishTaskDeleted,
 } = require('../events/publishers');
 
@@ -52,7 +53,7 @@ const _checkFlagged = async (task, tx, systemUserId) => {
     }
 };
 
-const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(1, Number(ms) || 1)));
 
 const _publishStatusChangedWithRetry = async (taskId, projectId, from, to, userId) => {
     const delays = [0, 150, 400];
@@ -62,7 +63,7 @@ const _publishStatusChangedWithRetry = async (taskId, projectId, from, to, userI
         try {
             if (delays[attempt] > 0) await _sleep(delays[attempt]);
             await PublishTaskStatusChanged(taskId, projectId, from, to, userId);
-            return;
+            return { success: true, taskId };
         } catch (err) {
             lastError = err;
             logger.error(`[TASK_STATUS_PUBLISH_FAILED] attempt=${attempt + 1} taskId=${taskId} projectId=${projectId} from=${from} to=${to} userId=${userId} error=${err.message}`);
@@ -70,7 +71,20 @@ const _publishStatusChangedWithRetry = async (taskId, projectId, from, to, userI
     }
 
     logger.error(`[TASK_STATUS_PUBLISH_GIVEUP] taskId=${taskId} projectId=${projectId} from=${from} to=${to} userId=${userId} error=${lastError?.message}`);
-    return;
+    try {
+        await PublishTaskStatusChangedDLQ({
+            taskId,
+            projectId,
+            from,
+            to,
+            userId,
+            error: lastError?.message,
+        });
+    } catch (dlqErr) {
+        logger.error(`[TASK_STATUS_DLQ_FAILED] taskId=${taskId} projectId=${projectId} error=${dlqErr.message}`);
+    }
+
+    return { success: false, taskId, reason: lastError?.message || 'publish-failed' };
 };
 
 const _isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
@@ -208,7 +222,10 @@ const UpdateStatus = async (taskId, { status, reason }, userId) => {
         return { updated: updatedTask, previousStatus: task.status, projectId: task.projectId };
     });
 
-    await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, status, userId);
+    const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, status, userId);
+    if (!publishResult.success) {
+        throw new APIError(502, `Task status updated but event publish failed: ${publishResult.reason}`);
+    }
     return updated;
 };
 
@@ -232,7 +249,10 @@ const ApproveTask = async (taskId, { comment }, userId) => {
         return { updated: updatedTask, previousStatus: task.status, projectId: task.projectId };
     });
 
-    await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.APPROVED, userId);
+    const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.APPROVED, userId);
+    if (!publishResult.success) {
+        throw new APIError(502, `Task approval updated but event publish failed: ${publishResult.reason}`);
+    }
     return updated;
 };
 
@@ -284,7 +304,10 @@ const RejectTask = async (taskId, { reason, rejectTo }, userId) => {
         return { updatedTask: refreshed, previousStatus: task.status, projectId: task.projectId };
     });
 
-    await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.REJECTED, userId);
+    const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.REJECTED, userId);
+    if (!publishResult.success) {
+        throw new APIError(502, `Task rejection updated but event publish failed: ${publishResult.reason}`);
+    }
 
     return updatedTask;
 };
@@ -323,7 +346,10 @@ const HandoverTask = async (taskId, { notes, handoverTo }, userId) => {
         return { updated: updatedTask, previousStatus: task.status, projectId: task.projectId };
     });
 
-    await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.IN_REVIEW, userId);
+    const publishResult = await _publishStatusChangedWithRetry(taskId, projectId, previousStatus, TASK_STATUS.IN_REVIEW, userId);
+    if (!publishResult.success) {
+        throw new APIError(502, `Task handover updated but event publish failed: ${publishResult.reason}`);
+    }
     return updated;
 };
 

@@ -22,3 +22,8 @@ Thumbs.db
 docker-compose.override.yml
 *.tgz
 .npm
+**/generated/**/*
+**/prisma/generated/**/*
+**/src/generated/**/*
+**/src/prisma/generated/**/*
+**/src/**/generated/**/*

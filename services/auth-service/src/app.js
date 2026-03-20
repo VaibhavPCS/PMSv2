@@ -8,95 +8,113 @@ const { middleware, errorHandler } = require('supertokens-node/framework/express
 const { InitAuth } = require('@pms/auth-middleware');
 const { ErrorHandler, NotFoundHandler } = require('@pms/error-handler');
 
+const prisma = require('./config/prisma');
 const AuthService = require('./services/auth.service');
 const AuthRoutes = require('./routes/auth.routes');
 
+const SessionConfig = {
+	override: {
+		functions: (originalImplementation) => ({
+			...originalImplementation,
+			createNewSession: async (input) => {
+				let role = 'member';
+				try {
+					const user = await prisma.user.findUnique({ where: { id: input.userId } });
+					if (user) role = user.role;
+				} catch (_) { }
+				return originalImplementation.createNewSession({
+					...input,
+					accessTokenPayload: { ...input.accessTokenPayload, role },
+				});
+			},
+		}),
+	},
+};
+
 const EmailPasswordConfig = {
-  signUpFeature: {
-    formFields: [{ id: 'name' }],
-  },
-  override: {
-    apis: (originalImplementation) => ({
-      ...originalImplementation,
-      signUpPOST: async (input) => {
-        const response = await originalImplementation.signUpPOST(input);
-        if (response.status === 'OK') {
-          const { id, email } = response.user;
-          const nameField = input.formFields.find((f) => f.id === 'name');
-          const name = nameField?.value ?? '';
-          try {
-            await AuthService.CreateUser(id, name, email);
-          } catch (err) {
-            console.error('[auth-service] postSignUp — failed to create user row:', err.message);
-          }
-        }
-
-        return response;
-      },
-      signInPOST: async (input) => {
-        const response = await originalImplementation.signInPOST(input);
-
-        if (response.status === 'OK') {
-          AuthService.SetLastLogin(response.user.id).catch((err) =>
-            console.error('[auth-service] postSignIn — failed to set lastLogin:', err.message)
-          );
-        }
-
-        return response;
-      },
-    }),
-  },
+	signUpFeature: {
+		formFields: [{ id: 'name' }],
+	},
+	override: {
+		apis: (originalImplementation) => ({
+			...originalImplementation,
+			signUpPOST: async (input) => {
+				const response = await originalImplementation.signUpPOST(input);
+				if (response.status === 'OK') {
+					const { id, email } = response.user;
+					const nameField = input.formFields.find((f) => f.id === 'name');
+					const name = nameField?.value ?? '';
+					try {
+						await AuthService.CreateUser(id, name, email);
+					} catch (err) {
+						console.error('[auth-service] postSignUp — failed to create user row:', err.message);
+					}
+				}
+				return response;
+			},
+			signInPOST: async (input) => {
+				const response = await originalImplementation.signInPOST(input);
+				if (response.status === 'OK') {
+					AuthService.SetLastLogin(response.user.id).catch((err) =>
+						console.error('[auth-service] postSignIn — failed to set lastLogin:', err.message)
+					);
+				}
+				return response;
+			},
+		}),
+	},
 };
 
 InitAuth({
-  connectionURI: process.env.SUPERTOKENS_CONNECTION_URI,
-  apiKey: process.env.SUPERTOKENS_API_KEY,
-  appName: process.env.APP_NAME || 'PMS',
-  apiDomain: process.env.API_DOMAIN,
-  websiteDomain: process.env.WEBSITE_DOMAIN,
-  includeEmailPassword: true,
-  emailPasswordConfig: EmailPasswordConfig,
+	connectionURI: process.env.SUPERTOKENS_CONNECTION_URI,
+	apiKey: process.env.SUPERTOKENS_API_KEY,
+	appName: process.env.APP_NAME || 'PMS',
+	apiDomain: process.env.API_DOMAIN,
+	websiteDomain: process.env.WEBSITE_DOMAIN,
+	includeEmailPassword: true,
+	emailPasswordConfig: EmailPasswordConfig,
+	sessionConfig: SessionConfig,
 });
 
 const App = Express();
 
 App.use(Helmet());
 App.use(Cors({
-  origin: process.env.WEBSITE_DOMAIN,
-  credentials: true,
-  allowedHeaders: ['content-type', ...SuperTokens.getAllCORSHeaders()],
+	origin: process.env.WEBSITE_DOMAIN,
+	credentials: true,
+	allowedHeaders: ['content-type', ...SuperTokens.getAllCORSHeaders()],
 }));
 App.use(Express.json());
 App.use(middleware());
 
 const AuthLimiter = RateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { status: 'fail', message: 'Too many requests. Please slow down.' },
+	windowMs: 15 * 60 * 1000,
+	max: 20,
+	message: { status: 'fail', message: 'Too many requests. Please slow down.' },
 });
 
 App.use('/api/v1/auth', AuthLimiter, AuthRoutes);
 
 if (process.env.NODE_ENV !== 'production') {
-  const SwaggerUi = require('swagger-ui-express');
-  const SwaggerSpec = require('./config/swagger');
+	const SwaggerUi = require('swagger-ui-express');
+	const SwaggerSpec = require('./config/swagger');
 
-  App.use(
-    '/api/v1/auth/docs',
-    (_req, res, next) => {
-      res.setHeader('Content-Security-Policy', '');
-      next();
-    },
-    SwaggerUi.serve,
-    SwaggerUi.setup(SwaggerSpec, {
-      customSiteTitle: 'PMS — Auth Service API',
-    }),
-  );
+	App.use(
+		'/api/v1/auth/docs',
+		(_req, res, next) => {
+			res.setHeader('Content-Security-Policy', '');
+			next();
+		},
+		SwaggerUi.serve,
+		SwaggerUi.setup(SwaggerSpec, {
+			customSiteTitle: 'PMS — Auth Service API',
+		}),
+	);
 
-  // Dev Portal - unified API index
-  App.get('/dev', (_req, res) => {
-    res.setHeader('Content-Security-Policy', '');
-    res.send(`<!DOCTYPE html>
+	// Dev Portal - unified API index
+	App.get('/dev', (_req, res) => {
+		res.setHeader('Content-Security-Policy', '');
+		res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -269,6 +287,41 @@ if (process.env.NODE_ENV !== 'production') {
         <div class="desc">Task and sprint APIs for planning, status progression, approval flow, and sprint-based tracking.</div>
         <div class="meta">pms_task | <a class="link" href="http://localhost:4004/api/v1/tasks/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
+      
+      <div class="row">
+        <div class="service">Notification Service</div>
+        <div class="port">localhost:4005</div>
+        <div class="desc">Notification dispatch (email, push), retry & DLQ handling, and per-user notification preferences.</div>
+        <div class="meta">pms_notification | <a class="link" href="http://localhost:4005/api/v1/notifications/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+      </div>
+
+      <div class="row">
+        <div class="service">Workflow Engine</div>
+        <div class="port">localhost:4006</div>
+        <div class="desc">Workflow orchestration, instance lifecycle, transitions, escalation rules and auto-assignment logic.</div>
+        <div class="meta">pms_workflow | <a class="link" href="http://localhost:4006/api/v1/workflows/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+      </div>
+
+      <div class="row">
+        <div class="service">Comms Service</div>
+        <div class="port">localhost:4007</div>
+        <div class="desc">Real-time messaging and presence (Socket.IO) including project chat, typing indicators, and reactions.</div>
+        <div class="meta">pms_comms | <a class="link" href="http://localhost:4007/api/v1/chats/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+      </div>
+
+      <div class="row">
+        <div class="service">File Services</div>
+        <div class="port">localhost:4008</div>
+        <div class="desc">File upload/download APIs, object storage (MinIO) integration, content validation and signed URLs.</div>
+        <div class="meta">pms_files | <a class="link" href="http://localhost:4008/api/v1/files/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+      </div>
+
+      <div class="row">
+        <div class="service">Meeting Service</div>
+        <div class="port">localhost:4009</div>
+        <div class="desc">Meeting scheduling, reminders, calendar links, and meeting participant management with email reminders.</div>
+        <div class="meta">pms_meeting | <a class="link" href="http://localhost:4009/api/v1/meetings/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+      </div>
     </section>
 
     <div class="footer">
@@ -283,7 +336,7 @@ if (process.env.NODE_ENV !== 'production') {
   </script>
 </body>
 </html>`);
-  });
+	});
 }
 
 App.use(errorHandler());

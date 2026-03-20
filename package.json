@@ -6,13 +6,15 @@
     "services/*"
   ],
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-rate-limit": "^7.4.1",
+    "file-type": "21.3.3",
     "helmet": "^8.0.0",
     "kafkajs": "^2.2.4",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^8.0.2",
+    "nodemailer": "8.0.3",
     "pino": "^9.5.0",
     "pino-pretty": "^13.0.0",
     "supertokens-node": "^9.2.3",
@@ -30,8 +32,9 @@
     "db:generate:all": "npm run db:generate -w @pms/auth-service && npm run db:generate -w @pms/workspace-service && npm run db:generate -w @pms/project-service && npm run db:generate -w @pms/task-service && npm run db:generate -w @pms/notification-service && npm run db:generate -w @pms/workflow-engine && npm run db:generate -w @pms/comms-service && npm run db:generate -w @pms/file-service && npm run db:generate -w @pms/meeting-service"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7",
     "concurrently": "^9.0.0",
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "nodemon": "^3.1.7",
+    "prisma": "^5.22.0"
   }
 }

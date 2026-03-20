@@ -5,12 +5,14 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../generated/prisma-client"
 }
 
 model User {
   id              String    @id            // SuperTokens userId — no separate UUID
   name            String
   email           String    @unique
+  role            String    @default("member")
   profilePicture  String?
   activeWorkspace String?                  // last-open workspace (UI state only)
   lastLogin       DateTime?

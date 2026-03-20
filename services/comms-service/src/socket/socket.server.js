@@ -32,6 +32,25 @@ const AttachSocket = (httpServer) => {
 
     io.on('connection', (socket) => {
         const _isValidProjectId = (projectId) => typeof projectId === 'string' && projectId.trim().length > 0;
+        const _isUserMemberOfProject = async (userId, projectId) => {
+            try {
+                const rows = await prisma.$queryRaw`
+                    SELECT 1
+                    FROM "ProjectMemberRoleCache"
+                    WHERE "projectId" = ${projectId}
+                      AND "userId" = ${userId}
+                    LIMIT 1
+                `;
+                return Array.isArray(rows) && rows.length > 0;
+            } catch (err) {
+                console.error('[comms-service] project membership check failed:', {
+                    userId,
+                    projectId,
+                    error: err.message,
+                });
+                return false;
+            }
+        };
 
         socket.on('join-chat', async (chatId) => {
             try {
@@ -69,6 +88,12 @@ const AttachSocket = (httpServer) => {
             try {
                 if (!_isValidProjectId(projectId) || !socket.userId) {
                     socket.emit('permission-denied', { projectId, reason: 'invalid-request' });
+                    return;
+                }
+
+                const canAccess = await _isUserMemberOfProject(socket.userId, projectId);
+                if (!canAccess) {
+                    socket.emit('permission-denied', { projectId, reason: 'forbidden' });
                     return;
                 }
 

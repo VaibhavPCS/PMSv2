@@ -34,7 +34,7 @@ const _requireAuthenticatedUser = (userId) => {
     }
 };
 
-const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(1, Number(ms) || 1)));
 
 const _publishWithRetry = async (publishFn, context) => {
     const delays = [0, 150, 400];

@@ -20,6 +20,11 @@ const _sanitizeMeetingLink = (value) => {
   }
 };
 
+const _sanitizeEmailHeader = (value, maxLength = 160) => String(value ?? '')
+  .replace(/[\r\n]+/g, ' ')
+  .trim()
+  .slice(0, maxLength);
+
 let _transporter = null;
 const _getTransporter = () => {
   if (!_transporter) {
@@ -95,7 +100,7 @@ const SendMeetingReminder = async (userId, meeting) => {
 
   await _send({
     to:      email,
-    subject: `Reminder: "${String(meeting.title || '').trim()}" starts in 15 minutes`,
+    subject: `Reminder: "${_sanitizeEmailHeader(meeting.title)}" starts in 15 minutes`,
     html: `
       <p>Hi,</p>
       <p>This is a reminder that <strong>${_escapeHtml(meeting.title)}</strong> is starting soon.</p>

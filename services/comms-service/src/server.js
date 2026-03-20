@@ -20,9 +20,18 @@ Server.on('error', (err) => {
     message: err.message,
     port: PORT,
   });
+
+  const forceExitTimer = setTimeout(() => {
+    process.exit(1);
+  }, 5000);
+
   try {
-    Server.close(() => process.exit(1));
+    Server.close(() => {
+      clearTimeout(forceExitTimer);
+      process.exit(1);
+    });
   } catch {
+    clearTimeout(forceExitTimer);
     process.exit(1);
   }
 });

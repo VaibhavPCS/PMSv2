@@ -1,4 +1,5 @@
 const { CatchAsync }  = require('@pms/error-handler');
+const Session         = require('supertokens-node/recipe/session');
 const AuthService     = require('../services/auth.service');
 
 const GetMe = CatchAsync(async (req, res) => {
@@ -15,4 +16,13 @@ const UpdateProfile = CatchAsync(async (req, res) => {
   res.status(200).json({ status: 'success', data: user });
 });
 
-module.exports = { GetMe, UpdateProfile };
+const UpdateUserRole = CatchAsync(async (req, res) => {
+  const { userId } = req.params;
+  const { role }   = req.body;
+
+  const user = await AuthService.UpdateUserRole(userId, role);
+  await Session.revokeAllSessionsForUser(userId);
+  res.status(200).json({ status: 'success', data: user });
+});
+
+module.exports = { GetMe, UpdateProfile, UpdateUserRole };

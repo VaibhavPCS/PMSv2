@@ -17,7 +17,7 @@ const StartRecurringScheduler = () => {
         logger.info(`[RECURRING_SCHEDULER] Spawned ${count} task(s) from due templates`);
       }
     } catch (err) {
-      logger.error('[RECURRING_SCHEDULER] Error during run', { error: err });
+      logger.error('[RECURRING_SCHEDULER] Error during run', { error: err?.message || String(err), stack: err?.stack });
     } finally {
       if (!stopped) {
         timeoutId = setTimeout(run, INTERVAL_MS);

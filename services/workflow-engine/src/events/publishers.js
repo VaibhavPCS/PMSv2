@@ -4,7 +4,19 @@ const { CreateLogger } = require('@pms/logger');
 const crypto = require('crypto');
 
 const logger = CreateLogger('workflow-engine:publishers');
-const MAX_AUTO_ASSIGN_ATTEMPTS = Number(process.env.WORKFLOW_AUTO_ASSIGN_MAX_ATTEMPTS || 3);
+const _rawMaxAttempts = process.env.WORKFLOW_AUTO_ASSIGN_MAX_ATTEMPTS;
+
+let MAX_AUTO_ASSIGN_ATTEMPTS = 3;
+if (_rawMaxAttempts !== undefined) {
+    const parsed = Number.parseInt(String(_rawMaxAttempts), 10);
+    if (Number.isFinite(parsed) && Number.isInteger(parsed) && parsed > 0) {
+        MAX_AUTO_ASSIGN_ATTEMPTS = parsed;
+    } else {
+        logger.warn('[WORKFLOW_AUTO_ASSIGN_MAX_ATTEMPTS_INVALID] Falling back to default of 3', {
+            value: _rawMaxAttempts,
+        });
+    }
+}
 
 let _producer = null;
 const getProducer = async () => {

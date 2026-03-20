@@ -39,6 +39,18 @@ App.use(Cors({
 App.use(Express.json());
 App.use(middleware());
 
+if (process.env.NODE_ENV !== 'production') {
+  const SwaggerUi   = require('swagger-ui-express');
+  const SwaggerSpec = require('./config/swagger');
+
+  App.use(
+    '/api/v1/chats/docs',
+    (_req, res, next) => { res.setHeader('Content-Security-Policy', ''); next(); },
+    SwaggerUi.serve,
+    SwaggerUi.setup(SwaggerSpec, { customSiteTitle: 'PMS — Comms Service API' }),
+  );
+}
+
 const ApiLimiter = RateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 App.use('/api/v1/chats',    ApiLimiter, ChatRoutes);
 App.use('/api/v1/messages', ApiLimiter, MessageRoutes);

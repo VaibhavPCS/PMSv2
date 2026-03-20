@@ -1,7 +1,7 @@
 const Router  = require('express').Router();
 const { z }   = require('zod');
 
-const { AuthenticateToken }                          = require('@pms/auth-middleware');
+const { AuthenticateToken, RequireRole }              = require('@pms/auth-middleware');
 const { ValidateRequest, ValidateQuery, PaginationSchema, CreateWorkspaceSchema,
         UpdateWorkspaceSchema, InviteMemberSchema,
         AcceptInviteSchema }                         = require('@pms/validators');
@@ -107,7 +107,7 @@ Router.post('/accept-invite', AuthenticateToken, ValidateRequest(AcceptInviteSch
  *       422:
  *         $ref: '#/components/responses/ValidationError'
  */
-Router.post('/', AuthenticateToken, ValidateRequest(CreateWorkspaceSchema), CreateWorkspace);
+Router.post('/', AuthenticateToken, RequireRole('super_admin', 'admin'), ValidateRequest(CreateWorkspaceSchema), CreateWorkspace);
 
 /**
  * @openapi

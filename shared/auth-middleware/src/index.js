@@ -5,8 +5,8 @@ const { verifySession } = require('supertokens-node/recipe/session/framework/exp
 const { APIError } = require('@pms/error-handler');
 const { ROLES } = require('@pms/constants');
 
-const InitAuth = ({ connectionURI, apiKey, appName, apiDomain, websiteDomain, includeEmailPassword = false, emailPasswordConfig = {} }) => {
-    const recipes = [Session.init()];
+const InitAuth = ({ connectionURI, apiKey, appName, apiDomain, websiteDomain, includeEmailPassword = false, emailPasswordConfig = {}, sessionConfig = {} }) => {
+    const recipes = [Session.init(sessionConfig)];
 
     if (includeEmailPassword) {
         recipes.push(EmailPassword.init(emailPasswordConfig));
