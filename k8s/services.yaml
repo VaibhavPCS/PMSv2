@@ -1,0 +1,459 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-auth
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-auth
+  template:
+    metadata:
+      labels:
+        app: pms-auth
+    spec:
+      containers:
+      - name: pms-auth
+        image: YOUR_REGISTRY/pms-auth:latest
+        ports:
+        - containerPort: 4001
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-auth-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/auth/me
+            port: 4001
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/auth/me
+            port: 4001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-auth
+  namespace: pms
+spec:
+  selector:
+    app: pms-auth
+  ports:
+  - port: 4001
+    targetPort: 4001
+---
+# ── WORKSPACE SERVICE ─────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-workspace
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-workspace
+  template:
+    metadata:
+      labels:
+        app: pms-workspace
+    spec:
+      containers:
+      - name: pms-workspace
+        image: YOUR_REGISTRY/pms-workspace:latest
+        ports:
+        - containerPort: 4002
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-workspace-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/workspaces/
+            port: 4002
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/workspaces/
+            port: 4002
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-workspace
+  namespace: pms
+spec:
+  selector:
+    app: pms-workspace
+  ports:
+  - port: 4002
+    targetPort: 4002
+---
+# ── PROJECT SERVICE ───────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-project
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-project
+  template:
+    metadata:
+      labels:
+        app: pms-project
+    spec:
+      containers:
+      - name: pms-project
+        image: YOUR_REGISTRY/pms-project:latest
+        ports:
+        - containerPort: 4003
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-project-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/projects/
+            port: 4003
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/projects/
+            port: 4003
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-project
+  namespace: pms
+spec:
+  selector:
+    app: pms-project
+  ports:
+  - port: 4003
+    targetPort: 4003
+---
+# ── TASK SERVICE ──────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-task
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-task
+  template:
+    metadata:
+      labels:
+        app: pms-task
+    spec:
+      containers:
+      - name: pms-task
+        image: YOUR_REGISTRY/pms-task:latest
+        ports:
+        - containerPort: 4004
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-task-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/tasks/
+            port: 4004
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/tasks/
+            port: 4004
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-task
+  namespace: pms
+spec:
+  selector:
+    app: pms-task
+  ports:
+  - port: 4004
+    targetPort: 4004
+---
+# ── NOTIFICATION SERVICE ──────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-notification
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-notification
+  template:
+    metadata:
+      labels:
+        app: pms-notification
+    spec:
+      containers:
+      - name: pms-notification
+        image: YOUR_REGISTRY/pms-notification:latest
+        ports:
+        - containerPort: 4005
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-notification-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/notifications/
+            port: 4005
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/notifications/
+            port: 4005
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-notification
+  namespace: pms
+spec:
+  selector:
+    app: pms-notification
+  ports:
+  - port: 4005
+    targetPort: 4005
+---
+# ── WORKFLOW ENGINE ───────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-workflow
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-workflow
+  template:
+    metadata:
+      labels:
+        app: pms-workflow
+    spec:
+      containers:
+      - name: pms-workflow
+        image: YOUR_REGISTRY/pms-workflow:latest
+        ports:
+        - containerPort: 4006
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-workflow-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/workflows/
+            port: 4006
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/workflows/
+            port: 4006
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-workflow
+  namespace: pms
+spec:
+  selector:
+    app: pms-workflow
+  ports:
+  - port: 4006
+    targetPort: 4006
+---
+# ── COMMS SERVICE (Socket.IO) ─────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-comms
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-comms
+  template:
+    metadata:
+      labels:
+        app: pms-comms
+    spec:
+      containers:
+      - name: pms-comms
+        image: YOUR_REGISTRY/pms-comms:latest
+        ports:
+        - containerPort: 4007
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-comms-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/chats/
+            port: 4007
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/chats/
+            port: 4007
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-comms
+  namespace: pms
+spec:
+  selector:
+    app: pms-comms
+  ports:
+  - port: 4007
+    targetPort: 4007
+---
+# ── FILE SERVICE ──────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-files
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-files
+  template:
+    metadata:
+      labels:
+        app: pms-files
+    spec:
+      containers:
+      - name: pms-files
+        image: YOUR_REGISTRY/pms-files:latest
+        ports:
+        - containerPort: 4008
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-files-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/files/
+            port: 4008
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/files/
+            port: 4008
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-files
+  namespace: pms
+spec:
+  selector:
+    app: pms-files
+  ports:
+  - port: 4008
+    targetPort: 4008
+---
+# ── MEETING SERVICE ───────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pms-meeting
+  namespace: pms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pms-meeting
+  template:
+    metadata:
+      labels:
+        app: pms-meeting
+    spec:
+      containers:
+      - name: pms-meeting
+        image: YOUR_REGISTRY/pms-meeting:latest
+        ports:
+        - containerPort: 4009
+        envFrom:
+        - secretRef:
+            name: pms-env
+        - configMapRef:
+            name: pms-meeting-config
+        livenessProbe:
+          httpGet:
+            path: /api/v1/meetings/
+            port: 4009
+          initialDelaySeconds: 20
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /api/v1/meetings/
+            port: 4009
+          initialDelaySeconds: 10
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pms-meeting
+  namespace: pms
+spec:
+  selector:
+    app: pms-meeting
+  ports:
+  - port: 4009
+    targetPort: 4009

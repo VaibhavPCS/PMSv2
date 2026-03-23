@@ -1,0 +1,94 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pms-ingress
+  namespace: pms
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  tls:
+  - hosts:
+    - dev.pms.upda.co.in
+    secretName: pms-tls
+  rules:
+  - host: dev.pms.upda.co.in
+    http:
+      paths:
+      - path: /auth/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-auth
+            port:
+              number: 4001
+      - path: /api/v1/auth/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-auth
+            port:
+              number: 4001
+      - path: /dev
+        pathType: Exact
+        backend:
+          service:
+            name: pms-auth
+            port:
+              number: 4001
+      - path: /api/v1/workspaces/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-workspace
+            port:
+              number: 4002
+      - path: /api/v1/projects/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-project
+            port:
+              number: 4003
+      - path: /api/v1/tasks/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-task
+            port:
+              number: 4004
+      - path: /api/v1/notifications/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-notification
+            port:
+              number: 4005
+      - path: /api/v1/workflows/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-workflow
+            port:
+              number: 4006
+      - path: /api/v1/chats/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-comms
+            port:
+              number: 4007
+      - path: /api/v1/files/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-files
+            port:
+              number: 4008
+      - path: /api/v1/meetings/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-meeting
+            port:
+              number: 4009
