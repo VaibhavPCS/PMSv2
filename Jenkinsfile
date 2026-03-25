@@ -5,9 +5,11 @@ pipeline {
         PROJECT_DIR  = "${WORKSPACE}/build"
         NVM_DIR      = '/home/jenkins/.nvm'
         NODE_VERSION = '20'
-        REGISTRY     = '192.168.1.226:5000'   // local Docker registry on the server
+        REGISTRY     = '192.168.1.226:5000'
         IMAGE_TAG    = "${BUILD_NUMBER}"
         NAMESPACE    = 'pms'
+        KUBECONFIG   = '/home/jenkins/.kube/config'
+        KUBECTL      = '/usr/local/bin/k3s kubectl'
     }
 
     options {
@@ -165,20 +167,20 @@ pipeline {
                     sed -i "s|:latest|:${IMAGE_TAG}|g"     ${PROJECT_DIR}/k8s/services.yaml
 
                     # Apply manifests
-                    kubectl apply -f ${PROJECT_DIR}/k8s/namespace-and-secrets.yaml
-                    kubectl apply -f ${PROJECT_DIR}/k8s/services.yaml
-                    kubectl apply -f ${PROJECT_DIR}/k8s/ingress.yaml
+                    ${KUBECTL} apply -f ${PROJECT_DIR}/k8s/namespace-and-secrets.yaml
+                    ${KUBECTL} apply -f ${PROJECT_DIR}/k8s/services.yaml
+                    ${KUBECTL} apply -f ${PROJECT_DIR}/k8s/ingress.yaml
 
                     # Wait for rollout
-                    kubectl rollout status deployment/pms-auth         -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-workspace     -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-project       -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-task          -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-notification  -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-workflow      -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-comms         -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-files         -n ${NAMESPACE} --timeout=120s
-                    kubectl rollout status deployment/pms-meeting       -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-auth         -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-workspace     -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-project       -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-task          -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-notification  -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-workflow      -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-comms         -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-files         -n ${NAMESPACE} --timeout=120s
+                    ${KUBECTL} rollout status deployment/pms-meeting       -n ${NAMESPACE} --timeout=120s
                 '''
             }
         }
@@ -219,7 +221,7 @@ pipeline {
         }
         failure {
             echo "Build #${BUILD_NUMBER} failed — check console output above"
-            sh 'kubectl get pods -n pms || true'
+            sh '${KUBECTL} get pods -n pms || true'
         }
         always {
             // Clean up injected .env files before workspace wipe
