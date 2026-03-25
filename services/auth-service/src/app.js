@@ -100,7 +100,7 @@ const AuthLimiter = RateLimit({
 
 App.use('/api/v1/auth', AuthLimiter, AuthRoutes);
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' || process.env.DOCS_ENABLED === 'true') {
 	const SwaggerUi = require('swagger-ui-express');
 	const SwaggerSpec = require('./config/swagger');
 
@@ -254,7 +254,7 @@ if (process.env.NODE_ENV !== 'production') {
     <section class="header">
       <h1 class="title">PMS API Documentation Index</h1>
       <p class="subtitle">Single entry point for interactive Swagger docs across all PMS services used by frontend and backend teams.</p>
-      <span class="status">Environment: Local Development</span>
+      <span class="status">Environment: ${process.env.NODE_ENV === 'production' ? 'UAT' : 'Local Development'}</span>
     </section>
 
     <section class="panel">
@@ -267,65 +267,65 @@ if (process.env.NODE_ENV !== 'production') {
 
       <div class="row">
         <div class="service">Auth Service</div>
-        <div class="port">localhost:4001</div>
+        <div class="port">:4001</div>
         <div class="desc">Identity APIs: signup, signin, session lifecycle, password reset, email verification, and profile endpoints.</div>
-        <div class="meta">pms_auth | <a class="link" href="http://localhost:4001/api/v1/auth/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_auth | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4001'}/api/v1/auth/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
 
       <div class="row">
         <div class="service">Workspace Service</div>
-        <div class="port">localhost:4002</div>
+        <div class="port">:4002</div>
         <div class="desc">Workspace and membership APIs including invites, role changes, ownership transfer, and member management.</div>
-        <div class="meta">pms_workspace | <a class="link" href="http://localhost:4002/api/v1/workspaces/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_workspace | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4002'}/api/v1/workspaces/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
 
       <div class="row">
         <div class="service">Project Service</div>
-        <div class="port">localhost:4003</div>
+        <div class="port">:4003</div>
         <div class="desc">Project lifecycle APIs with project-head assignment, membership updates, and deadline extension tracking.</div>
-        <div class="meta">pms_project | <a class="link" href="http://localhost:4003/api/v1/projects/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_project | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4003'}/api/v1/projects/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
 
       <div class="row">
         <div class="service">Task Service</div>
-        <div class="port">localhost:4004</div>
+        <div class="port">:4004</div>
         <div class="desc">Task and sprint APIs for planning, status progression, approval flow, and sprint-based tracking.</div>
-        <div class="meta">pms_task | <a class="link" href="http://localhost:4004/api/v1/tasks/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_task | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4004'}/api/v1/tasks/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
-      
+
       <div class="row">
         <div class="service">Notification Service</div>
-        <div class="port">localhost:4005</div>
+        <div class="port">:4005</div>
         <div class="desc">Notification dispatch (email, push), retry & DLQ handling, and per-user notification preferences.</div>
-        <div class="meta">pms_notification | <a class="link" href="http://localhost:4005/api/v1/notifications/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_notification | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4005'}/api/v1/notifications/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
 
       <div class="row">
         <div class="service">Workflow Engine</div>
-        <div class="port">localhost:4006</div>
+        <div class="port">:4006</div>
         <div class="desc">Workflow orchestration, instance lifecycle, transitions, escalation rules and auto-assignment logic.</div>
-        <div class="meta">pms_workflow | <a class="link" href="http://localhost:4006/api/v1/workflows/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_workflow | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4006'}/api/v1/workflows/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
 
       <div class="row">
         <div class="service">Comms Service</div>
-        <div class="port">localhost:4007</div>
+        <div class="port">:4007</div>
         <div class="desc">Real-time messaging and presence (Socket.IO) including project chat, typing indicators, and reactions.</div>
-        <div class="meta">pms_comms | <a class="link" href="http://localhost:4007/api/v1/chats/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_comms | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4007'}/api/v1/chats/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
 
       <div class="row">
         <div class="service">File Services</div>
-        <div class="port">localhost:4008</div>
+        <div class="port">:4008</div>
         <div class="desc">File upload/download APIs, object storage (MinIO) integration, content validation and signed URLs.</div>
-        <div class="meta">pms_files | <a class="link" href="http://localhost:4008/api/v1/files/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_files | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4008'}/api/v1/files/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
 
       <div class="row">
         <div class="service">Meeting Service</div>
-        <div class="port">localhost:4009</div>
+        <div class="port">:4009</div>
         <div class="desc">Meeting scheduling, reminders, calendar links, and meeting participant management with email reminders.</div>
-        <div class="meta">pms_meeting | <a class="link" href="http://localhost:4009/api/v1/meetings/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
+        <div class="meta">pms_meeting | <a class="link" href="${process.env.API_DOMAIN || 'http://localhost:4009'}/api/v1/meetings/docs" target="_blank" rel="noopener noreferrer">Open Docs</a></div>
       </div>
     </section>
 

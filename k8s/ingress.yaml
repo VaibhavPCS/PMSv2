@@ -29,6 +29,13 @@ spec:
             name: pms-auth
             port:
               number: 4001
+      - path: /api/v1/auth/docs
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-auth
+            port:
+              number: 4001
       - path: /dev
         pathType: Exact
         backend:
@@ -43,7 +50,21 @@ spec:
             name: pms-workspace
             port:
               number: 4002
+      - path: /api/v1/workspaces/docs
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-workspace
+            port:
+              number: 4002
       - path: /api/v1/projects/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-project
+            port:
+              number: 4003
+      - path: /api/v1/projects/docs
         pathType: Prefix
         backend:
           service:
@@ -57,7 +78,21 @@ spec:
             name: pms-task
             port:
               number: 4004
+      - path: /api/v1/tasks/docs
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-task
+            port:
+              number: 4004
       - path: /api/v1/notifications/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-notification
+            port:
+              number: 4005
+      - path: /api/v1/notifications/docs
         pathType: Prefix
         backend:
           service:
@@ -71,7 +106,21 @@ spec:
             name: pms-workflow
             port:
               number: 4006
+      - path: /api/v1/workflows/docs
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-workflow
+            port:
+              number: 4006
       - path: /api/v1/chats/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-comms
+            port:
+              number: 4007
+      - path: /api/v1/chats/docs
         pathType: Prefix
         backend:
           service:
@@ -85,7 +134,21 @@ spec:
             name: pms-files
             port:
               number: 4008
+      - path: /api/v1/files/docs
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-files
+            port:
+              number: 4008
       - path: /api/v1/meetings/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-meeting
+            port:
+              number: 4009
+      - path: /api/v1/meetings/docs
         pathType: Prefix
         backend:
           service:

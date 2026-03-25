@@ -22,8 +22,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-auth-secret
         - configMapRef:
             name: pms-auth-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/auth/me
@@ -74,8 +83,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-workspace-secret
         - configMapRef:
             name: pms-workspace-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/workspaces/
@@ -125,8 +143,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-project-secret
         - configMapRef:
             name: pms-project-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/projects/
@@ -176,8 +203,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-task-secret
         - configMapRef:
             name: pms-task-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/tasks/
@@ -227,8 +263,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-notification-secret
         - configMapRef:
             name: pms-notification-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/notifications/
@@ -278,8 +323,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-workflow-secret
         - configMapRef:
             name: pms-workflow-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/workflows/
@@ -329,8 +383,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-comms-secret
         - configMapRef:
             name: pms-comms-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/chats/
@@ -352,6 +415,8 @@ metadata:
 spec:
   selector:
     app: pms-comms
+  # Socket.IO requires sticky sessions — clients must always reach the same pod
+  sessionAffinity: ClientIP
   ports:
   - port: 4007
     targetPort: 4007
@@ -380,8 +445,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-files-secret
         - configMapRef:
             name: pms-files-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/files/
@@ -431,8 +505,17 @@ spec:
         envFrom:
         - secretRef:
             name: pms-env
+        - secretRef:
+            name: pms-meeting-secret
         - configMapRef:
             name: pms-meeting-config
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /api/v1/meetings/

@@ -33,7 +33,7 @@ App.use('/webhooks', Express.raw({ type: 'application/json' }), GithubWebhookRou
 App.use(Express.json());
 App.use(middleware());
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' || process.env.DOCS_ENABLED === 'true') {
   const SwaggerUi   = require('swagger-ui-express');
   const SwaggerSpec = require('./config/swagger');
   App.use(
