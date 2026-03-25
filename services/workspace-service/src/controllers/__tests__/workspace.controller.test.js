@@ -16,6 +16,8 @@ jest.mock('@pms/auth-middleware', () => ({
     req.session = { getUserId: () => 'st-user-123' };
     next();
   },
+  RequireRole: () => (_req, _res, next) => next(),
+  OptionalAuth: (_req, _res, next) => next(),
 }));
 
 jest.mock('@pms/validators', () => ({

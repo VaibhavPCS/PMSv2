@@ -10,6 +10,8 @@ jest.mock('@pms/auth-middleware', () => ({
     req.session = { getUserId: () => mockUserId };
     next();
   },
+  RequireRole: () => (_req, _res, next) => next(),
+  OptionalAuth: (_req, _res, next) => next(),
 }));
 
 jest.mock('@pms/kafka', () => ({
