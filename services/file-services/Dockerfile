@@ -3,10 +3,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --workspace=@pms/file-service --include-workspace-root
-
 COPY shared/ ./shared/
 COPY services/file-services/ ./services/file-services/
+RUN npm ci --workspace=@pms/file-service --include-workspace-root
 RUN npx prisma generate --schema=./services/file-services/prisma/schema.prisma && \
     npm prune --omit=dev
 

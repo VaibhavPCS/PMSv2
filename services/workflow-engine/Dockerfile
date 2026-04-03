@@ -3,10 +3,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --workspace=@pms/workflow-engine --include-workspace-root
-
 COPY shared/ ./shared/
 COPY services/workflow-engine/ ./services/workflow-engine/
+RUN npm ci --workspace=@pms/workflow-engine --include-workspace-root
 RUN npx prisma generate --schema=./services/workflow-engine/prisma/schema.prisma && \
     npm prune --omit=dev
 
