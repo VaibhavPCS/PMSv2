@@ -1,5 +1,5 @@
 # ── Stage 1: install & generate ───────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -10,11 +10,12 @@ RUN npx prisma generate --schema=./services/task-service/prisma/schema.prisma &&
     npm prune --omit=dev
 
 # ── Stage 2: lean runtime image ────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates openssl && rm -rf /var/lib/apt/lists/*
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 COPY --from=builder --chown=appuser:appgroup /app ./
 
