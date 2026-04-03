@@ -3,6 +3,8 @@ pipeline {
 
     parameters {
         booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip unit/integration tests')
+        booleanParam(name: 'SKIP_MIGRATIONS', defaultValue: false, description: 'Skip Prisma migrate deploy (DB migrations)')
+        booleanParam(name: 'SKIP_ROLLOUT_WAIT', defaultValue: false, description: 'Skip waiting for Kubernetes rollout status')
         booleanParam(name: 'SKIP_HEALTH_CHECK', defaultValue: false, description: 'Skip post-deploy health checks')
     }
 
@@ -153,6 +155,9 @@ pipeline {
 
         // ─── 8. RUN DB MIGRATIONS ───────────────────────────────────────────
         stage('Migrate DB') {
+            when {
+                expression { !params.SKIP_MIGRATIONS }
+            }
             steps {
                 echo '── Applying database migrations ──'
                 sh '''
@@ -185,16 +190,17 @@ pipeline {
                     ${KUBECTL} apply -f ${PROJECT_DIR}/k8s/services.yaml
                     ${KUBECTL} apply -f ${PROJECT_DIR}/k8s/ingress.yaml
 
-                    # Wait for rollout
-                    ${KUBECTL} rollout status deployment/pms-auth         -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-workspace     -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-project       -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-task          -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-notification  -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-workflow      -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-comms         -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-files         -n ${NAMESPACE} --timeout=120s
-                    ${KUBECTL} rollout status deployment/pms-meeting       -n ${NAMESPACE} --timeout=120s
+                    if [ "${SKIP_ROLLOUT_WAIT}" != "true" ]; then
+                      ${KUBECTL} rollout status deployment/pms-auth         -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-workspace     -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-project       -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-task          -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-notification  -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-workflow      -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-comms         -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-files         -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-meeting       -n ${NAMESPACE} --timeout=120s
+                    fi
                 '''
             }
         }
