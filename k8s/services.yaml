@@ -5,7 +5,7 @@ metadata:
   name: pms-auth
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-auth
@@ -28,10 +28,10 @@ spec:
             name: pms-auth-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -66,7 +66,7 @@ metadata:
   name: pms-workspace
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-workspace
@@ -89,10 +89,10 @@ spec:
             name: pms-workspace-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -126,7 +126,7 @@ metadata:
   name: pms-project
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-project
@@ -149,10 +149,10 @@ spec:
             name: pms-project-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -186,7 +186,7 @@ metadata:
   name: pms-task
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-task
@@ -209,10 +209,10 @@ spec:
             name: pms-task-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -246,7 +246,7 @@ metadata:
   name: pms-notification
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-notification
@@ -269,10 +269,10 @@ spec:
             name: pms-notification-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -306,7 +306,7 @@ metadata:
   name: pms-workflow
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-workflow
@@ -329,10 +329,10 @@ spec:
             name: pms-workflow-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -366,7 +366,7 @@ metadata:
   name: pms-comms
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-comms
@@ -389,10 +389,10 @@ spec:
             name: pms-comms-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -428,7 +428,7 @@ metadata:
   name: pms-files
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-files
@@ -451,10 +451,10 @@ spec:
             name: pms-files-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
@@ -488,7 +488,7 @@ metadata:
   name: pms-meeting
   namespace: pms
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: pms-meeting
@@ -511,10 +511,10 @@ spec:
             name: pms-meeting-config
         resources:
           requests:
-            cpu: "100m"
+            cpu: "10m"
             memory: "128Mi"
           limits:
-            cpu: "500m"
+            cpu: "200m"
             memory: "512Mi"
         livenessProbe:
           httpGet:
