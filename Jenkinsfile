@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    parameters {
+        booleanParam(name: 'SKIP_TESTS', defaultValue: false, description: 'Skip unit/integration tests')
+        booleanParam(name: 'SKIP_HEALTH_CHECK', defaultValue: false, description: 'Skip post-deploy health checks')
+    }
+
     environment {
         PROJECT_DIR  = "${WORKSPACE}/build"
         NVM_DIR      = '/home/jenkins/.nvm'
@@ -94,6 +99,9 @@ pipeline {
 
         // ─── 5. RUN TESTS ───────────────────────────────────────────────────
         stage('Test') {
+            when {
+                expression { !params.SKIP_TESTS }
+            }
             steps {
                 echo '── Running tests ──'
                 sh '''
@@ -193,6 +201,9 @@ pipeline {
 
         // ─── 10. HEALTH CHECK ───────────────────────────────────────────────
         stage('Health Check') {
+            when {
+                expression { !params.SKIP_HEALTH_CHECK }
+            }
             steps {
                 echo '── Verifying services ──'
                 sh '''
