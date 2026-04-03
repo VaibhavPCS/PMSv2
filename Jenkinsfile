@@ -162,6 +162,12 @@ pipeline {
             steps {
                 echo '── Deploying to Kubernetes ──'
                 sh '''
+                    ${KUBECTL} -n kube-system patch svc traefik --type='json' -p='[
+                      {"op":"replace","path":"/spec/type","value":"NodePort"},
+                      {"op":"replace","path":"/spec/ports/0/nodePort","value":32080},
+                      {"op":"replace","path":"/spec/ports/1/nodePort","value":32443}
+                    ]' || true
+
                     # Update image tags in manifests
                     sed -i "s|YOUR_REGISTRY|${REGISTRY}|g" ${PROJECT_DIR}/k8s/services.yaml
                     sed -i "s|:latest|:${IMAGE_TAG}|g"     ${PROJECT_DIR}/k8s/services.yaml

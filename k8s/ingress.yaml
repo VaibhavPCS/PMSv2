@@ -4,13 +4,8 @@ metadata:
   name: pms-ingress
   namespace: pms
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
-  tls:
-  - hosts:
-    - dev.pms.upda.co.in
-    secretName: pms-tls
   rules:
   - host: dev.pms.upda.co.in
     http:
