@@ -14,9 +14,19 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@shared/*": ["../../shared/*"]
+      "@shared/types": ["../../shared/types/index.ts"],
+      "@shared/types/*": ["../../shared/types/*"],
+      "@shared/utils": ["../../shared/utils/index.ts"],
+      "@shared/utils/*": ["../../shared/utils/*"],
+      "@shared/constants": ["../../shared/constants/index.ts"],
+      "@shared/constants/*": ["../../shared/constants/*"],
+      "@shared/ui": ["../../shared/ui/index.ts"],
+      "@shared/ui/*": ["../../shared/ui/*"],
+      "@shared/hooks": ["../../shared/hooks/index.ts"],
+      "@shared/hooks/*": ["../../shared/hooks/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../../shared/**/*.ts", "../../shared/**/*.tsx"],

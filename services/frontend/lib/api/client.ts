@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import type { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
 
@@ -8,7 +8,7 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
-apiClient.interceptors.request.use((config: AxiosRequestConfig) => {
+apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     const workspaceId = localStorage.getItem('currentWorkspaceId');
     if (workspaceId && config.headers) {
