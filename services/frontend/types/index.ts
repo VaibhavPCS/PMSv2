@@ -27,3 +27,10 @@ export interface CreateTaskFormState {
 export type SidebarState = 'expanded' | 'collapsed';
 export type ModalMode = 'create' | 'edit' | 'view';
 export type ViewMode = 'table' | 'kanban' | 'list';
+
+export interface RegisterFormState {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
