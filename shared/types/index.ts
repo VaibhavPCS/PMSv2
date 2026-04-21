@@ -224,3 +224,38 @@ export interface ActivityItem {
   metadata?: Record<string, unknown>;
   createdAt: string;
 }
+
+export interface LoginFormState {
+  email: string;
+  password: string;
+}
+
+export interface RegisterFormState {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface CreateProjectFormState {
+  name: string;
+  description: string;
+  workspaceId: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface CreateTaskFormState {
+  title: string;
+  description: string;
+  projectId: string;
+  assigneeId: string;
+  priority: TaskPriority;   // ← exact union type
+  dueDate: string;
+  estimatedHours: number | '';
+  tags: string[];
+}
+
+export type SidebarState = 'expanded' | 'collapsed';
+export type ModalMode = 'create' | 'edit' | 'view';
+export type ViewMode = 'table' | 'kanban' | 'list';
