@@ -26,4 +26,5 @@ docker-compose.override.yml
 **/prisma/generated/**/*
 **/src/generated/**/*
 **/src/prisma/generated/**/*
-**/src/**/generated/**/*
+**/src/**/generated/**/*.prod-migration/
+.prod-migration

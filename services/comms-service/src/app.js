@@ -51,7 +51,9 @@ if (process.env.NODE_ENV !== 'production' || process.env.DOCS_ENABLED === 'true'
   );
 }
 
-const ApiLimiter = RateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+// The unread-count + chat-list badges poll from every page; 100/15min trips 429s
+// across the whole app. Keep a generous runaway-loop backstop instead.
+const ApiLimiter = RateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false });
 App.use('/api/v1/chats',    ApiLimiter, ChatRoutes);
 App.use('/api/v1/messages', ApiLimiter, MessageRoutes);
 

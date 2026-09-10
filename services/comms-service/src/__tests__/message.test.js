@@ -82,6 +82,7 @@ jest.mock('../config/prisma', () => ({
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
   messageReaction: {
     create: jest.fn(),
@@ -565,7 +566,7 @@ describe('Message Controller', () => {
 
   describe('GET /api/v1/messages/unread-count', () => {
     it('returns the unread message count for the user', async () => {
-      prisma.$queryRaw.mockResolvedValue([{ count: 5 }]);
+      prisma.message.count.mockResolvedValue(5);
 
       const res = await request(App)
         .get(`${MSG_BASE}/unread-count`)
@@ -573,10 +574,18 @@ describe('Message Controller', () => {
 
       expect(res.body.status).toBe('success');
       expect(res.body.data.count).toBe(5);
+      expect(prisma.message.count).toHaveBeenCalledWith({
+        where: {
+          isDeleted: false,
+          senderId: { not: USER_ID },
+          chat: { participants: { some: { userId: USER_ID, isActive: true } } },
+          reads: { none: { userId: USER_ID } },
+        },
+      });
     });
 
     it('returns 0 when there are no unread messages', async () => {
-      prisma.$queryRaw.mockResolvedValue([{ count: 0 }]);
+      prisma.message.count.mockResolvedValue(0);
 
       const res = await request(App)
         .get(`${MSG_BASE}/unread-count`)

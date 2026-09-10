@@ -13,6 +13,19 @@ const GetMyChats = CatchAsync(async (req, res) => {
     res.status(200).json({ status: 'success', data: chats });
 });
 
+const GetOrganizationChats = CatchAsync(async (req, res) => {
+    const userId = req.session.getUserId();
+    const chats = await ChatService.GetOrganizationChats(userId);
+    // Frontend reads `response.chats` (falls back to `data`); expose both.
+    res.status(200).json({ status: 'success', chats, data: chats });
+});
+
+const GetOrganizationUsers = CatchAsync(async (_req, res) => {
+    const users = await ChatService.GetOrganizationUsers();
+    // Frontend reads `response.users` (falls back to `data`); expose both.
+    res.status(200).json({ status: 'success', users, data: users });
+});
+
 const GetChatById = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
     const chat = await ChatService.GetChatById(req.params.id, userId);
@@ -37,4 +50,12 @@ const ArchiveChat = CatchAsync(async (req, res) => {
     res.status(200).json({ status: 'success', data: null });
 });
 
-module.exports = { CreateChat, GetMyChats, GetChatById, AddParticipant, RemoveParticipant, ArchiveChat };
+const GetUnreadCount = CatchAsync(async (req, res) => {
+    const userId = req.session.getUserId();
+    const count = await ChatService.GetUnreadCount(userId);
+    // Top-level `count` is what the frontend BadgeProvider reads
+    // (messagesResponse.count); `data.count` keeps the service convention.
+    res.status(200).json({ status: 'success', count, data: { count } });
+});
+
+module.exports = { CreateChat, GetMyChats, GetOrganizationChats, GetOrganizationUsers, GetChatById, AddParticipant, RemoveParticipant, ArchiveChat, GetUnreadCount };

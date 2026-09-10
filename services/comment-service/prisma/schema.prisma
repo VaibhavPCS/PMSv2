@@ -1,0 +1,78 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
+  output   = "../generated/prisma-client"
+}
+
+// A comment attached to any entity (task, project, sprint, ...).
+// Content is encrypted at rest (AES-256-GCM) like chat messages.
+// Threaded replies via self-relation on parentId.
+model Comment {
+  id          String   @id @default(uuid())
+  workspaceId String
+  entityType  String                          // 'task' | 'project' | 'sprint' | ...
+  entityId    String
+  authorId    String
+  content     String                          // base64 ciphertext
+  iv          String                          // base64 GCM iv
+  authTag     String                          // base64 GCM auth tag
+  parentId    String?                         // null = top-level comment
+  mentions    String[] @default([])           // mentioned userIds
+  attachments String[] @default([])           // file-service file ids
+  isEdited    Boolean  @default(false)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  reactions CommentReaction[]
+
+  @@index([entityType, entityId, createdAt])
+  @@index([parentId])
+  @@index([workspaceId])
+  @@map("comments")
+}
+
+model CommentReaction {
+  id        String @id @default(uuid())
+  commentId String
+  userId    String
+  emoji     String
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId, emoji])
+  @@index([commentId])
+  @@map("comment_reactions")
+}
+
+
+model WorkspaceMemberCache {
+  workspaceId String
+  userId      String
+  role        String
+  updatedAt   DateTime @updatedAt
+
+  @@id([workspaceId, userId])
+  @@index([workspaceId])
+  @@map("workspace_member_cache")
+}
+
+// Tracks existence of referenced entities (task/project/sprint) so a comment
+// can be 404'd when its target was deleted. Populated from *_CREATED / *_DELETED
+// events. A MISSING row means "unknown" (cold cache) — never a hard block.
+model EntityExistsCache {
+  entityType String
+  entityId   String
+  exists     Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+
+  @@id([entityType, entityId])
+  @@map("entity_exists_cache")
+}

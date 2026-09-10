@@ -27,8 +27,13 @@ const _getTransporter = () => {
   return _transporter;
 };
 
-const CreateInvite = async (workspaceId, email, role, requesterId) => {
+const CreateInvite = async (workspaceId, email, role, requesterId, requesterEmail = null) => {
   await _requireAdminOrOwner(workspaceId, requesterId);
+
+  // Only enforced when the email could be resolved (soft-fail upstream).
+  if (requesterEmail && requesterEmail.toLowerCase() === email.toLowerCase()) {
+    throw new APIError(400, 'You cannot invite yourself.');
+  }
 
   if (role === ROLES.OWNER) {
     throw new APIError(400, 'Cannot invite someone as owner. Use transfer ownership.');
@@ -68,8 +73,13 @@ const ValidateInvite = async (token) => {
   return invite;
 };
 
-const AcceptInvite = async (token, userId) => {
+const AcceptInvite = async (token, userId, callerEmail = null) => {
   const invite = await ValidateInvite(token);
+
+  // Only enforced when the caller's email could be resolved (soft-fail upstream).
+  if (callerEmail && callerEmail.toLowerCase() !== invite.email.toLowerCase()) {
+    throw new APIError(403, 'This invite was issued to a different email address.');
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.workspaceMember.upsert({

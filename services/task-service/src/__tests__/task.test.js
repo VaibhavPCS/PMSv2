@@ -41,14 +41,22 @@ const mockPrisma = {
   taskAssignee: {
     create: jest.fn(),
     upsert: jest.fn(),
+    delete: jest.fn(),
+    deleteMany: jest.fn(),
   },
   taskHistory: {
+    create: jest.fn(),
+  },
+  recurringTaskTemplate: {
     create: jest.fn(),
   },
   sprint: {
     findUnique: jest.fn(),
   },
   projectMemberRoleCache: {
+    findUnique: jest.fn(),
+  },
+  projectEndDateCache: {
     findUnique: jest.fn(),
   },
 };
@@ -81,6 +89,7 @@ const SPRINT_ID    = 'dddddddd-dddd-1ddd-8ddd-dddddddddddd';
 
 const futureDate = () => new Date(Date.now() + 86_400_000 * 30).toISOString();
 const pastDate   = () => new Date(Date.now() - 86_400_000).toISOString();
+const nowDate    = () => new Date().toISOString();
 
 /** Minimal task record returned from the DB for most tests */
 const makeTask = (overrides = {}) => ({
@@ -88,6 +97,7 @@ const makeTask = (overrides = {}) => ({
   title: 'Test Task',
   description: 'desc',
   priority: 'medium',
+  startDate: new Date(nowDate()),
   dueDate: new Date(futureDate()),
   projectId: PROJECT_ID,
   workspaceId: WORKSPACE_ID,
@@ -121,6 +131,7 @@ describe('POST /api/v1/tasks — CreateTask', () => {
     title: 'My Task',
     description: 'desc',
     priority: 'high',
+    startDate: nowDate(),
     dueDate: futureDate(),
     assignees: [USER_ID],
     projectId: PROJECT_ID,
@@ -131,6 +142,8 @@ describe('POST /api/v1/tasks — CreateTask', () => {
   beforeEach(() => {
     mockTransaction();
     mockPrisma.projectMemberRoleCache.findUnique.mockResolvedValue({ role: 'member' });
+    mockPrisma.projectEndDateCache.findUnique.mockResolvedValue(null);
+    mockPrisma.sprint.findUnique.mockResolvedValue(null);
     mockPrisma.task.create.mockResolvedValue(makeTask());
     mockPrisma.taskAssignee.create.mockResolvedValue({});
     mockPrisma.taskHistory.create.mockResolvedValue({});
@@ -171,6 +184,121 @@ describe('POST /api/v1/tasks — CreateTask', () => {
     const { title, ...body } = validBody;
     const res = await request(app).post('/api/v1/tasks').send(body);
     expect(res.status).toBe(422);
+  });
+
+  it('201 — creates a recurring task and persists a template', async () => {
+    mockPrisma.recurringTaskTemplate.create.mockResolvedValue({});
+
+    const res = await request(app)
+      .post('/api/v1/tasks')
+      .send({
+        ...validBody,
+        isRecurring: true,
+        recurringFrequency: 'weekly',
+        recurringEndDate: new Date(Date.now() + 86_400_000 * 90).toISOString(),
+      });
+
+    expect(res.status).toBe(201);
+    expect(mockPrisma.recurringTaskTemplate.create).toHaveBeenCalled();
+  });
+
+  it('422 — recurring task without recurringFrequency is rejected', async () => {
+    const res = await request(app)
+      .post('/api/v1/tasks')
+      .send({
+        ...validBody,
+        isRecurring: true,
+        recurringEndDate: new Date(Date.now() + 86_400_000 * 90).toISOString(),
+      });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('422 — recurring task without recurringEndDate is rejected', async () => {
+    const res = await request(app)
+      .post('/api/v1/tasks')
+      .send({
+        ...validBody,
+        isRecurring: true,
+        recurringFrequency: 'weekly',
+      });
+
+    expect(res.status).toBe(422);
+  });
+});
+
+// ─── POST /api/v1/tasks/:id/reassign ─────────────────────────────────────────
+
+describe('POST /api/v1/tasks/:id/reassign — ReassignTask', () => {
+  const reassignDue = () => new Date(Date.now() + 86_400_000 * 10).toISOString();
+
+  beforeEach(() => {
+    mockTransaction();
+    mockPrisma.taskAssignee.delete.mockResolvedValue({});
+    mockPrisma.taskAssignee.upsert.mockResolvedValue({});
+    mockPrisma.task.update.mockResolvedValue(makeTask({ status: 'pending' }));
+    mockPrisma.taskHistory.create.mockResolvedValue({});
+    mockPrisma.sprint.findUnique.mockResolvedValue(null);
+    mockPrisma.projectEndDateCache.findUnique.mockResolvedValue(null);
+  });
+
+  it('200 — project head reassigns to a single assignee', async () => {
+    mockPrisma.task.findUnique.mockResolvedValue(
+      makeTask({ status: 'in_progress', projectHeadId: USER_ID })
+    );
+
+    const res = await request(app)
+      .post(`/api/v1/tasks/${TASK_ID}/reassign`)
+      .send({ assigneeId: OTHER_USER, dueDate: reassignDue() });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('pending');
+  });
+
+  it('422 — assigneeId must be a valid UUID', async () => {
+    const res = await request(app)
+      .post(`/api/v1/tasks/${TASK_ID}/reassign`)
+      .send({ assigneeId: 'not-a-uuid', dueDate: reassignDue() });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('403 — non-project-head cannot reassign', async () => {
+    mockPrisma.task.findUnique.mockResolvedValue(
+      makeTask({ status: 'in_progress', projectHeadId: OTHER_USER })
+    );
+
+    const res = await request(app)
+      .post(`/api/v1/tasks/${TASK_ID}/reassign`)
+      .send({ assigneeId: OTHER_USER, dueDate: reassignDue() });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('400 — due date after project end date is rejected', async () => {
+    mockPrisma.task.findUnique.mockResolvedValue(
+      makeTask({ status: 'in_progress', projectHeadId: USER_ID })
+    );
+    mockPrisma.projectEndDateCache.findUnique.mockResolvedValue({
+      projectId: PROJECT_ID,
+      endDate: new Date(Date.now() + 86_400_000 * 5),
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/tasks/${TASK_ID}/reassign`)
+      .send({ assigneeId: OTHER_USER, dueDate: new Date(Date.now() + 86_400_000 * 60).toISOString() });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('404 — task not found', async () => {
+    mockPrisma.task.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post(`/api/v1/tasks/${TASK_ID}/reassign`)
+      .send({ assigneeId: OTHER_USER, dueDate: reassignDue() });
+
+    expect(res.status).toBe(404);
   });
 });
 
@@ -280,6 +408,7 @@ describe('PATCH /api/v1/tasks/:id/status — UpdateStatus', () => {
     mockPrisma.task.update.mockResolvedValue(makeTask({ status: 'in_progress' }));
     mockPrisma.taskHistory.create.mockResolvedValue({});
     mockPrisma.sprint.findUnique.mockResolvedValue(null);
+    mockPrisma.task.count.mockResolvedValue(0);
   });
 
   it('200 — pending → in_progress (valid transition)', async () => {
@@ -308,6 +437,19 @@ describe('PATCH /api/v1/tasks/:id/status — UpdateStatus', () => {
     expect(res.status).toBe(200);
   });
 
+  it('400 — cannot complete a task with open subtasks', async () => {
+    mockPrisma.task.findUnique.mockResolvedValue(
+      makeTask({ status: 'in_progress', assignees: [{ taskId: TASK_ID, userId: USER_ID }] })
+    );
+    mockPrisma.task.count.mockResolvedValue(2);
+
+    const res = await request(app)
+      .patch(`/api/v1/tasks/${TASK_ID}/status`)
+      .send({ status: 'completed' });
+
+    expect(res.status).toBe(400);
+  });
+
   it('200 — in_progress → on_hold (valid transition)', async () => {
     mockPrisma.task.findUnique.mockResolvedValue(
       makeTask({ status: 'in_progress', assignees: [{ taskId: TASK_ID, userId: USER_ID }] })
@@ -316,7 +458,7 @@ describe('PATCH /api/v1/tasks/:id/status — UpdateStatus', () => {
 
     const res = await request(app)
       .patch(`/api/v1/tasks/${TASK_ID}/status`)
-      .send({ status: 'on_hold' });
+      .send({ status: 'on_hold', reason: 'Blocked on dependency' });
 
     expect(res.status).toBe(200);
   });
@@ -509,20 +651,29 @@ describe('POST /api/v1/tasks/:id/reject — RejectTask', () => {
     mockPrisma.taskAssignee.upsert.mockResolvedValue({});
     mockPrisma.taskHistory.create.mockResolvedValue({});
     mockPrisma.sprint.findUnique.mockResolvedValue(null);
+    mockPrisma.projectEndDateCache.findUnique.mockResolvedValue(null);
   });
 
   it('200 — project head rejects a completed task', async () => {
     const res = await request(app)
       .post(`/api/v1/tasks/${TASK_ID}/reject`)
-      .send({ reason: 'Needs rework', rejectTo: OTHER_USER });
+      .send({ reason: 'Needs rework', rejectTo: OTHER_USER, newDueDate: futureDate() });
 
     expect(res.status).toBe(200);
+  });
+
+  it('422 — newDueDate is required', async () => {
+    const res = await request(app)
+      .post(`/api/v1/tasks/${TASK_ID}/reject`)
+      .send({ reason: 'Needs rework', rejectTo: OTHER_USER });
+
+    expect(res.status).toBe(422);
   });
 
   it('422 — rejectTo must be a valid UUID', async () => {
     const res = await request(app)
       .post(`/api/v1/tasks/${TASK_ID}/reject`)
-      .send({ reason: 'Needs rework', rejectTo: 'not-a-uuid' });
+      .send({ reason: 'Needs rework', rejectTo: 'not-a-uuid', newDueDate: futureDate() });
 
     expect(res.status).toBe(422);
   });
@@ -542,7 +693,7 @@ describe('POST /api/v1/tasks/:id/reject — RejectTask', () => {
 
     const res = await request(app)
       .post(`/api/v1/tasks/${TASK_ID}/reject`)
-      .send({ reason: 'bad', rejectTo: stranger });
+      .send({ reason: 'bad', rejectTo: stranger, newDueDate: futureDate() });
 
     expect(res.status).toBe(400);
   });
@@ -555,7 +706,7 @@ describe('POST /api/v1/tasks/:id/reject — RejectTask', () => {
 
     const res = await request(app)
       .post(`/api/v1/tasks/${TASK_ID}/reject`)
-      .send({ reason: 'bad', rejectTo: OTHER_USER });
+      .send({ reason: 'bad', rejectTo: OTHER_USER, newDueDate: futureDate() });
 
     expect(res.status).toBe(403);
   });
@@ -568,7 +719,7 @@ describe('POST /api/v1/tasks/:id/reject — RejectTask', () => {
 
     const res = await request(app)
       .post(`/api/v1/tasks/${TASK_ID}/reject`)
-      .send({ reason: 'bad', rejectTo: OTHER_USER });
+      .send({ reason: 'bad', rejectTo: OTHER_USER, newDueDate: futureDate() });
 
     expect(res.status).toBe(400);
   });
@@ -671,5 +822,107 @@ describe('DELETE /api/v1/tasks/:id — DeleteTask', () => {
 
     const res = await request(app).delete(`/api/v1/tasks/${TASK_ID}`);
     expect(res.status).toBe(404);
+  });
+});
+
+// ─── GET /api/v1/tasks/all — GetAllWorkspaceTasks ─────────────────────────────
+
+describe('GET /api/v1/tasks/all — GetAllWorkspaceTasks', () => {
+  beforeEach(() => {
+    mockPrisma.task.findMany.mockResolvedValue([makeTask(), makeTask({ id: 'eeeeeeee-eeee-1eee-8eee-eeeeeeeeeeee', status: 'approved' })]);
+  });
+
+  it('200 — returns all workspace tasks under { tasks } via workspace-id header', async () => {
+    const res = await request(app)
+      .get('/api/v1/tasks/all')
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.tasks)).toBe(true);
+    expect(res.body.tasks).toHaveLength(2);
+    expect(mockPrisma.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true, workspaceId: WORKSPACE_ID } }),
+    );
+  });
+
+  it('200 — accepts workspaceId query param as fallback and honors status filter', async () => {
+    mockPrisma.task.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/v1/tasks/all')
+      .query({ workspaceId: WORKSPACE_ID, status: 'completed' });
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true, workspaceId: WORKSPACE_ID, status: 'completed' } }),
+    );
+  });
+
+  it('400 — missing workspace-id (no header, no query)', async () => {
+    const res = await request(app).get('/api/v1/tasks/all');
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/v1/tasks/approval-stats — GetApprovalStats ──────────────────────
+
+describe('GET /api/v1/tasks/approval-stats — GetApprovalStats', () => {
+  it('200 — returns bare { pendingApproval, approved } object', async () => {
+    mockPrisma.task.count
+      .mockResolvedValueOnce(3) // pendingApproval (completed + in_review)
+      .mockResolvedValueOnce(5); // approved
+
+    const res = await request(app)
+      .get('/api/v1/tasks/approval-stats')
+      .query({ workspaceId: WORKSPACE_ID });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ pendingApproval: 3, approved: 5 });
+  });
+
+  it('200 — resolves workspace from header when no query', async () => {
+    mockPrisma.task.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+    const res = await request(app)
+      .get('/api/v1/tasks/approval-stats')
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ pendingApproval: 0, approved: 0 });
+  });
+
+  it('400 — missing workspace-id', async () => {
+    const res = await request(app).get('/api/v1/tasks/approval-stats');
+    expect(res.status).toBe(400);
+  });
+});
+
+// ─── GET /api/v1/tasks/approval-tasks — GetApprovalTasks ──────────────────────
+
+describe('GET /api/v1/tasks/approval-tasks — GetApprovalTasks', () => {
+  it('200 — returns pending-approval tasks under { tasks }', async () => {
+    mockPrisma.task.findMany.mockResolvedValue([makeTask({ status: 'completed' })]);
+
+    const res = await request(app)
+      .get('/api/v1/tasks/approval-tasks')
+      .query({ workspaceId: WORKSPACE_ID });
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.tasks)).toBe(true);
+    expect(res.body.tasks).toHaveLength(1);
+    expect(mockPrisma.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          workspaceId: WORKSPACE_ID,
+          isActive: true,
+          status: { in: ['completed', 'in_review'] },
+        },
+      }),
+    );
+  });
+
+  it('400 — missing workspace-id', async () => {
+    const res = await request(app).get('/api/v1/tasks/approval-tasks');
+    expect(res.status).toBe(400);
   });
 });

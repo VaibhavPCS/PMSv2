@@ -1,0 +1,314 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x", "debian-openssl-3.0.x"]
+  output        = "../generated/prisma-client"
+}
+
+// ============================================================================
+// CURRENT-STATE METRIC TABLES
+// Incrementally maintained by Kafka event consumers. One row per entity,
+// always reflecting the latest computed value. REST API reads these directly.
+// ============================================================================
+
+// Per-employee performance (ANALYTICS_JOB_TYPES.EMPLOYEE_METRICS).
+model EmployeeMetric {
+  id          String @id @default(uuid())
+  userId      String
+  workspaceId String
+
+  // Task counts
+  totalTasks      Int @default(0)
+  completedCount  Int @default(0)
+  todoCount       Int @default(0)
+  inProgressCount Int @default(0)
+  overdueCount    Int @default(0)
+
+  // Approval / quality
+  approvedCount         Int   @default(0)
+  rejectedCount         Int   @default(0)
+  pendingApprovalCount  Int   @default(0)
+  approvalRate          Float @default(0)
+  firstTimeApprovalRate Float @default(0)
+  avgRejectionsPerTask  Float @default(0)
+  reworkRate            Float @default(0)
+  onTimeCompletionRate  Float @default(0)
+
+  // Time (milliseconds for precision; derived hours can be computed in API)
+  avgTimeToStartMs    Float @default(0)
+  avgTimeToCompleteMs Float @default(0)
+  avgTimeToApprovalMs Float @default(0)
+  totalActiveTimeMs   Float @default(0)
+
+  // Composite
+  productivityScore Float @default(0)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("employee_metrics")
+}
+
+// Workspace-scoped leaderboard rows (ANALYTICS_JOB_TYPES.EMPLOYEE_METRICS / LEADER_METRICS).
+// Pre-ranked so the API only reads + orders by rank.
+model LeaderboardEntry {
+  id          String @id @default(uuid())
+  workspaceId String
+  userId      String
+
+  completedCount       Int   @default(0)
+  approvalRate         Float @default(0)
+  onTimeCompletionRate Float @default(0)
+  productivityScore    Float @default(0)
+  rank                 Int   @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId, rank])
+  @@index([userId])
+  @@map("leaderboard_entries")
+}
+
+// Per-project rollups (ANALYTICS_JOB_TYPES.PROJECT_METRICS).
+model ProjectMetric {
+  id          String @id @default(uuid())
+  projectId   String
+  workspaceId String
+
+  totalTasks           Int @default(0)
+  completedCount       Int @default(0)
+  inProgressCount      Int @default(0)
+  todoCount            Int @default(0)
+  overdueCount         Int @default(0)
+  rejectedCount        Int @default(0)
+  pendingApprovalCount Int @default(0)
+  completedLast7Days   Int @default(0)
+
+  // JSON distributions: { todo, inProgress, done, onHold, ... } / { low, medium, high, urgent }
+  statusDistribution   Json?
+  priorityDistribution Json?
+
+  approvalRate         Float @default(0)
+  onTimeCompletionRate Float @default(0)
+  avgCycleTimeMs       Float @default(0)
+  avgLeadTimeMs        Float @default(0)
+  completionPercent    Float @default(0)
+  healthScore          Float @default(0)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([projectId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@map("project_metrics")
+}
+
+// Per-workspace rollups (ANALYTICS_JOB_TYPES.WORKSPACE_METRICS).
+model WorkspaceMetric {
+  id          String @id @default(uuid())
+  workspaceId String
+
+  totalProjects  Int @default(0)
+  totalMembers   Int @default(0)
+  totalTasks     Int @default(0)
+  completedCount Int @default(0)
+  overdueCount   Int @default(0)
+  activeSprints  Int @default(0)
+
+  statusDistribution   Json?
+  priorityDistribution Json?
+
+  approvalRate         Float @default(0)
+  onTimeCompletionRate Float @default(0)
+  avgCycleTimeMs       Float @default(0)
+  throughputLast7Days  Int   @default(0)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([workspaceId])
+  @@index([workspaceId])
+  @@map("workspace_metrics")
+}
+
+// Per-task lifecycle facts (ANALYTICS_JOB_TYPES.TASK_LIFECYCLE).
+model TaskLifecycleStat {
+  id          String  @id @default(uuid())
+  taskId      String
+  projectId   String
+  workspaceId String
+  assigneeId  String?
+
+  // Durations in milliseconds
+  totalDurationMs   Float @default(0) // createdAt -> completedAt (lead time)
+  workingDurationMs Float @default(0) // startedAt -> completedAt (cycle time)
+  reviewDurationMs  Float @default(0) // submitted -> approved/rejected
+  cycleTimeMs       Float @default(0)
+  leadTimeMs        Float @default(0)
+
+  rejectionCount   Int     @default(0)
+  approvalAttempts Int     @default(0)
+  reassignments    Int     @default(0)
+  isFirstTimeRight Boolean @default(false)
+
+  status         String?
+  priority       String?
+  createdAtSrc   DateTime?
+  startedAtSrc   DateTime?
+  completedAtSrc DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([taskId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([assigneeId])
+  @@map("task_lifecycle_stats")
+}
+
+// ============================================================================
+// TIME-SERIES SNAPSHOT TABLES
+// Append-only rows written by the node-cron scheduler (daily) and/or by
+// consumers for agile charts. Used for trend lines. Never updated in place.
+// ============================================================================
+
+// Burndown / burnup per sprint per day.
+model BurndownPoint {
+  id          String @id @default(uuid())
+  workspaceId String
+  projectId   String
+  sprintId    String
+  entityId    String // == sprintId, generic accessor for charting layer
+
+  remainingCount Int   @default(0) // tasks not done
+  completedCount Int   @default(0)
+  totalCount     Int   @default(0)
+  idealRemaining Float @default(0) // ideal burndown line value
+
+  capturedAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([entityId])
+  @@index([sprintId, capturedAt])
+  @@index([capturedAt])
+  @@map("burndown_points")
+}
+
+// Velocity per closed sprint.
+model VelocityPoint {
+  id          String @id @default(uuid())
+  workspaceId String
+  projectId   String
+  sprintId    String
+  entityId    String // == sprintId
+
+  committedCount Int     @default(0)
+  completedCount Int     @default(0)
+  velocity       Float   @default(0)
+  sprintName     String?
+
+  capturedAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([entityId])
+  @@index([sprintId])
+  @@index([capturedAt])
+  @@map("velocity_points")
+}
+
+// Cumulative Flow Diagram: one row per capture with per-status cumulative counts.
+model CfdPoint {
+  id          String @id @default(uuid())
+  workspaceId String
+  projectId   String
+  entityId    String // projectId or sprintId
+
+  todoCount       Int @default(0)
+  inProgressCount Int @default(0)
+  inReviewCount   Int @default(0)
+  doneCount       Int @default(0)
+  onHoldCount     Int @default(0)
+  // Full breakdown for arbitrary statuses
+  statusCounts Json?
+
+  capturedAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([entityId])
+  @@index([projectId, capturedAt])
+  @@index([capturedAt])
+  @@map("cfd_points")
+}
+
+// Throughput / created-vs-resolved per period bucket.
+model ThroughputPoint {
+  id          String  @id @default(uuid())
+  workspaceId String
+  projectId   String?
+  entityId    String // projectId or workspaceId
+
+  createdCount  Int @default(0)
+  resolvedCount Int @default(0)
+  overdueCount  Int @default(0)
+
+  // Flow timing aggregates for the bucket
+  avgCycleTimeMs Float @default(0)
+  avgLeadTimeMs  Float @default(0)
+
+  period     String   @default("daily") // daily | weekly
+  capturedAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([entityId])
+  @@index([entityId, capturedAt])
+  @@index([capturedAt])
+  @@map("throughput_points")
+}
+
+// Generic snapshot for any current-state metric, enabling trend charts
+// (e.g. productivityScore over time, project health over time, workload).
+model MetricSnapshot {
+  id          String @id @default(uuid())
+  workspaceId String
+  entityId    String // userId | projectId | workspaceId
+  entityType  String // employee | leader | project | workspace
+  metricKey   String // productivityScore | completionPercent | overdueCount | workload | ...
+
+  value Float @default(0)
+  // Full metric blob captured at this point for rich trend views.
+  payload Json?
+
+  period     String   @default("daily")
+  capturedAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([entityId])
+  @@index([entityId, metricKey, capturedAt])
+  @@index([capturedAt])
+  @@map("metric_snapshots")
+}
+
+// ============================================================================
+// EVENT IDEMPOTENCY
+// Tracks processed Kafka event ids so re-delivered events do not double-count
+// incremental metric updates.
+// ============================================================================
+model ProcessedEvent {
+  id          String   @id @default(uuid())
+  eventId     String   @unique
+  topic       String
+  jobType     String?
+  processedAt DateTime @default(now())
+
+  @@index([topic])
+  @@map("processed_events")
+}

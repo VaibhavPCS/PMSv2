@@ -37,6 +37,7 @@ model Task {
   @@index([status])
   @@index([workspaceId])
   @@index([isFlagged])
+  startDate     DateTime
 }
 
 model TaskAssignee {

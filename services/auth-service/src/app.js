@@ -7,11 +7,13 @@ const { middleware, errorHandler } = require('supertokens-node/framework/express
 
 const { InitAuth } = require('@pms/auth-middleware');
 const { ErrorHandler, NotFoundHandler } = require('@pms/error-handler');
+const { PasswordSchema } = require('@pms/validators');
 
 const { CreateLogger } = require('@pms/logger');
 const prisma = require('./config/prisma');
 const AuthService = require('./services/auth.service');
 const AuthRoutes = require('./routes/auth.routes');
+const InternalRoutes = require('./routes/internal.routes');
 
 const _logger = CreateLogger('auth-service:session');
 
@@ -38,7 +40,24 @@ const SessionConfig = {
 
 const EmailPasswordConfig = {
 	signUpFeature: {
-		formFields: [{ id: 'name' }],
+		formFields: [
+			{
+				id: 'name',
+				validate: async (value) => {
+					const name = typeof value === 'string' ? value.trim() : '';
+					if (name.length < 3) return 'Name must be at least 3 characters long.';
+					return undefined;
+				},
+			},
+			{
+				id: 'password',
+				validate: async (value) => {
+					const result = PasswordSchema.safeParse(value);
+					if (!result.success) return result.error.issues[0].message;
+					return undefined;
+				},
+			},
+		],
 	},
 	override: {
 		apis: (originalImplementation) => ({
@@ -87,17 +106,24 @@ App.use(Helmet());
 App.use(Cors({
 	origin: process.env.WEBSITE_DOMAIN,
 	credentials: true,
-	allowedHeaders: ['content-type', ...SuperTokens.getAllCORSHeaders()],
+	allowedHeaders: ['content-type', 'st-auth-mode', ...SuperTokens.getAllCORSHeaders()],
 }));
 App.use(Express.json());
 App.use(middleware());
 
+// These routes are profile reads/writes (/me, role change) — NOT the login
+// endpoint (SuperTokens owns /auth/signin, which this limiter does not cover).
+// A single SPA page legitimately fires /auth/me from many components, so a tiny
+// cap (was 20) trips 429s and blanks the app. Keep a runaway-loop backstop only.
 const AuthLimiter = RateLimit({
 	windowMs: 15 * 60 * 1000,
-	max: 20,
+	max: 300,
+	standardHeaders: true,
+	legacyHeaders: false,
 	message: { status: 'fail', message: 'Too many requests. Please slow down.' },
 });
 
+App.use('/api/v1/auth/internal', InternalRoutes);
 App.use('/api/v1/auth', AuthLimiter, AuthRoutes);
 
 if (process.env.NODE_ENV !== 'production' || process.env.DOCS_ENABLED === 'true') {

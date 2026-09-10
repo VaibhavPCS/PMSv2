@@ -12,9 +12,9 @@ const GetMembers = CatchAsync(async (req, res) => {
 const AddMember = CatchAsync(async (req, res) => {
     const userId    = req.session.getUserId();
     const projectId = req.params.id;
-    const { userId: newUserId, role } = req.body;
+    const { userId: newUserId, role, reportsTo } = req.body;
 
-    const member = await MemberService.AddMember(projectId, newUserId, role, userId);
+    const member = await MemberService.AddMember(projectId, newUserId, role, userId, reportsTo);
     res.status(201).json(member);
 });
 
@@ -31,9 +31,9 @@ const ChangeMemberRole = CatchAsync(async (req, res) => {
     const userId    = req.session.getUserId();
     const projectId = req.params.id;
     const targetId  = req.params.userId;
-    const { role }  = req.body;
+    const { role, reportsTo } = req.body;
 
-    await MemberService.ChangeMemberRole(projectId, targetId, role, userId);
+    await MemberService.ChangeMemberRole(projectId, targetId, role, userId, reportsTo);
     res.status(200).json({ message: 'Member role updated successfully' });
 });
 

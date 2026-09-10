@@ -14,8 +14,8 @@ const CreateMeetingSchema = z.object({
     endTime: z.string().datetime(),
     meetingLink: z.string().url().optional(),
     participantIds: z.array(z.string().uuid()).min(1),
-}).strict().refine((obj) => new Date(obj.endTime) > new Date(obj.startTime), {
-    message: 'endTime must be after startTime',
+}).strict().refine((obj) => new Date(obj.endTime).getTime() - new Date(obj.startTime).getTime() >= 15 * 60 * 1000, {
+    message: 'Meeting must be at least 15 minutes long',
     path: ['endTime'],
 });
 
@@ -36,7 +36,7 @@ const UpdateMeetingSchema = z.object({
     path: ['endTime'],
 });
 
-const RSVPSchema = z.object({ rsvp: z.enum(['accepted', 'declined']) }).strict();
+const RSVPSchema = z.object({ rsvp: z.enum(['accepted', 'declined', 'tentative']) }).strict();
 
 Router.post('/', AuthenticateToken, ValidateRequest(CreateMeetingSchema), CreateMeeting);
 Router.get('/', AuthenticateToken, ValidateQuery(GetMeetingsQuerySchema), GetMeetings);

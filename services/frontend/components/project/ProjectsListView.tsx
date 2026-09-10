@@ -1,0 +1,476 @@
+'use client';
+
+// Ported from OLD app/routes/workspace/workspace.tsx — the project list/grid
+// screen ("N Projects" + tabs + search/sort + Add Project + cards). UI is
+// pixel-identical; react-router replaced with next/navigation behaviour and
+// the workspace existence checks use buildApiUrl from @/lib/config.
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
+import { fetchData, postData, deleteData, apiClient } from '@/lib/fetch-util';
+import { buildApiUrl } from '@/lib/config';
+import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Plus, Search, Settings } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+
+import { Breadcrumb } from '@/components/layout/Breadcrumb';
+import { ProjectTabs } from '@/components/project/ProjectTabs';
+import { ProjectCard } from '@/components/project/ProjectCard';
+import { WorkspaceSelector } from '@/components/project/WorkspaceSelector';
+import { AddProjectModal } from '@/components/project/AddProjectModal';
+import { CreateWorkspaceModal } from '@/components/layout/CreateWorkspaceModal';
+import { ProjectCardSkeleton } from '@/components/project/project-card-skeleton';
+
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
+
+interface Project {
+  _id: string;
+  propertyId?: string;
+  title: string;
+  description: string;
+  status: ProjectStatus;
+  progress: number;
+  projectHead: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  members: Array<{
+    userId: {
+      _id: string;
+      name: string;
+      email: string;
+      role: string;
+    };
+    addedAt?: string;
+  }>;
+  startDate: string;
+  endDate: string;
+  budget?: {
+    allocated: number;
+    spent: number;
+  };
+}
+
+interface Workspace {
+  _id: string;
+  name: string;
+  description?: string;
+  members?: Array<{
+    userId: any;
+    role: string;
+    joinedAt: string;
+  }>;
+}
+
+export function ProjectsListView() {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const router = useRouter();
+
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortOption, setSortOption] = useState('title-asc');
+  const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
+
+  // Keep a live snapshot of projects for rollback on refresh failure
+  const projectsRef = useRef<Project[]>([]);
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
+  // Check if user can add projects (admin OR lead/owner in current workspace)
+  const canAddProject = () => {
+    // Global admin can always add projects
+    if (user?.role === 'admin') return true;
+
+    // Check if user is lead or owner in current workspace.
+    // New API returns members already filtered to the caller as [{ role }] (no
+    // userId), so guard the userId reads and fall back to that single member.
+    if (currentWorkspace?.members?.length) {
+      const currentUserId = (user as any)?._id || (user as any)?.id;
+      const userMember =
+        currentWorkspace.members.find(
+          (m: any) => m?.userId?._id === currentUserId || m?.userId === currentUserId
+        ) ?? (currentWorkspace.members.length === 1 ? currentWorkspace.members[0] : undefined);
+      return userMember?.role === 'lead' || userMember?.role === 'owner';
+    }
+
+    return false;
+  };
+
+  const checkWorkspaceExistence = async (workspaceId: string) => {
+    // Use apiClient so the request goes through the gateway (path-map maps
+    // /workspace/:id/exists -> /api/v1/workspaces/:id/exists) with cookies +
+    // workspace-id header. GetWorkspaceById on the backend throws 404 (gone) /
+    // 403 (not a member); a 200 means it exists.
+    try {
+      const res = await apiClient.get(`/workspace/${workspaceId}/exists`);
+      const ws = res.data?.data?.workspace ?? res.data?.workspace;
+      if (ws?.isArchived) {
+        toast.error('This workspace has been archived');
+        return false;
+      }
+      return true;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 404) {
+        toast.error('This workspace has been deleted or no longer exists');
+        return false;
+      }
+      if (status === 403) {
+        toast.error("You don't have permission to access this workspace");
+        return false;
+      }
+      // Network/other error — don't block the user with a false "deleted".
+      console.error('Error checking workspace existence:', error);
+      return true;
+    }
+  };
+
+  const fetchWorkspaces = useCallback(async () => {
+    try {
+      const response = await fetchData('/workspace');
+      const workspaceList = ((response?.data?.data ?? response?.data ?? response?.workspaces ?? []) as any[]).map((w: any) => w.workspaceId ?? w).filter(Boolean);
+
+      setWorkspaces(workspaceList);
+
+      // New API has no `currentWorkspace`; auto-select like the old app — prefer the
+      // previously-selected id (localStorage), else the first workspace.
+      const storedId =
+        typeof window !== 'undefined' ? localStorage.getItem('currentWorkspaceId') : null;
+      const current =
+        response.currentWorkspace ||
+        workspaceList.find((w: any) => (w?._id || w?.id) === storedId) ||
+        workspaceList[0] ||
+        null;
+      setCurrentWorkspace(current);
+
+      // Persist current workspace id for request headers
+      const cid = current?._id || current?.id;
+      if (cid) {
+        localStorage.setItem('currentWorkspaceId', cid);
+
+        // Check if current workspace exists (show notification but don't block)
+        checkWorkspaceExistence(cid).catch((err) => {
+          console.error('Workspace existence check failed:', err);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load workspaces', error);
+    }
+  }, []);
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetchData('/project');
+      const list = (response?.data?.data ?? response?.data ?? response?.projects ?? []) as any[];
+      const currentUserId = (user as any)?.id || (user as any)?._id;
+      const filtered = list.filter((p: any) => {
+        // Admin can see all projects
+        if (user?.role === 'admin') return true;
+
+        const isCreator = p?.creator?._id === currentUserId;
+        const headIds = [...(p?.projectHeads || []), ...(p?.projectHead ? [p.projectHead] : [])]
+          .map((head: any) => (head?._id || head)?.toString())
+          .filter(Boolean);
+        const isHead = headIds.includes(currentUserId?.toString());
+        // New API scopes each project's `members` to the caller as [{ role }]
+        // (no userId/_id), and only returns projects the caller belongs to — so a
+        // member row whose id is undefined means "I'm a member". Keep the old
+        // id-match too for any fuller-shaped responses.
+        const isMemberRow = (m: any) => {
+          const mid = m?.userId?._id ?? m?.userId ?? m?._id;
+          return mid === undefined || mid === currentUserId;
+        };
+        const inMembers = Array.isArray(p?.members)
+          ? p.members.some(isMemberRow)
+          : Array.isArray(p?.categories)
+            ? p.categories.some(
+                (c: any) => Array.isArray(c.members) && c.members.some(isMemberRow)
+              )
+            : false;
+        return isCreator || isHead || inMembers;
+      });
+      // New project-service uses `name`; the UI (cards, sort, search) reads `title`.
+      setProjects(filtered.map((p: any) => ({ ...p, title: p.title ?? p.name ?? '' })));
+    } catch (error) {
+      console.error('Failed to load projects', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Ensure workspaces are loaded and currentWorkspace is set before fetching projects
+      (async () => {
+        setLoading(true);
+        await fetchWorkspaces();
+        await fetchProjects();
+        setLoading(false);
+      })();
+    }
+  }, [isAuthenticated, fetchWorkspaces, fetchProjects]);
+
+  const switchWorkspace = async (workspaceId: string) => {
+    try {
+      await postData('/workspace/switch', { workspaceId });
+      // Persist new workspace id immediately so subsequent requests use correct header
+      localStorage.setItem('currentWorkspaceId', workspaceId);
+      await fetchWorkspaces();
+      await fetchProjects();
+    } catch (error) {
+      console.error('Failed to switch workspace', error);
+    }
+  };
+
+  const handleCreateWorkspace = () => {
+    setShowCreateWorkspaceModal(true);
+  };
+
+  const handleWorkspaceChange = (workspaceId: string) => {
+    if (workspaceId === 'create-new-workspace') {
+      handleCreateWorkspace();
+      return;
+    }
+    switchWorkspace(workspaceId);
+  };
+
+  const handleStatusChange = async (
+    projectId: string,
+    newStatus: ProjectStatus,
+    newProgress: number
+  ) => {
+    // Snapshot before optimistic update for rollback if refresh fails
+    const previousSnapshot = projectsRef.current.map((p) => ({ ...p }));
+
+    // Optimistic update
+    setProjects((prevProjects) =>
+      prevProjects.map((p) =>
+        p._id === projectId ? { ...p, status: newStatus, progress: newProgress } : p
+      )
+    );
+
+    // Re-fetch to ensure consistency with backend; rollback if it fails
+    try {
+      await fetchProjects();
+    } catch (err) {
+      console.error('Failed to refresh projects after status change', err);
+      // Roll back to previous snapshot to avoid stale UI
+      setProjects(previousSnapshot);
+      toast.error('Could not refresh projects. Reverted the status change.');
+    }
+  };
+
+  const handleDelete = async (projectId: string) => {
+    try {
+      await deleteData(`/project/${projectId}`);
+      toast.success('Project deleted successfully');
+      fetchProjects();
+    } catch (error) {
+      toast.error('Failed to delete project');
+    }
+  };
+
+  const filteredProjects = projects
+    .filter((project) => activeTab === 'All' || project.status === activeTab)
+    .filter((project) => ((project.title || (project as any).name || '')).toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    const [sortBy, order] = sortOption.split('-');
+
+    // Handle date comparisons
+    if (sortBy === 'startDate' || sortBy === 'endDate') {
+      const dateA = new Date(a[sortBy]);
+      const dateB = new Date(b[sortBy]);
+      if (order === 'asc') {
+        return dateA.getTime() - dateB.getTime();
+      } else {
+        return dateB.getTime() - dateA.getTime();
+      }
+    }
+
+    // Handle string comparisons (for title)
+    const aValue = a[sortBy as keyof Project];
+    const bValue = b[sortBy as keyof Project];
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      if (order === 'asc') {
+        return aValue.localeCompare(bValue);
+      } else {
+        return bValue.localeCompare(aValue);
+      }
+    }
+    return 0;
+  });
+
+  if (isLoading || loading) {
+    return (
+      <div className="p-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(274px,1fr))] gap-[15px]">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <ProjectCardSkeleton key={index} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    router.push('/sign-in');
+    return null;
+  }
+
+  return (
+    <>
+      {/* Main Content Container - matches Figma white card */}
+      <div className="bg-white rounded-[8px] min-h-[940px] mx-[10px] md:mx-[20px] mt-[20px] md:mt-[30px] p-[15px] md:p-[10px]">
+        {/* Breadcrumb */}
+        <div className="mb-[15px] md:mb-[25px]">
+          <Breadcrumb />
+        </div>
+
+        {/* Header Section */}
+        <div className="flex flex-col gap-[15px] mb-[20px] md:mb-[25px]">
+          {/* Title and Project Selector Row */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-[15px] md:gap-0">
+            {/* Left: Title */}
+            <div className="flex flex-col gap-[5px]">
+              <h1 className="text-[20px] md:text-[24px] font-bold text-[#040110] font-['Inter']">
+                {projects.length} Projects
+              </h1>
+              <p className="text-[13px] md:text-[14px] text-[#040110] opacity-60 font-normal">
+                Ensure timely completion with organized task tracking.
+              </p>
+            </div>
+
+            {/* Right: Workspace Selector (always visible); Create option gated by admin */}
+            <div className="flex items-center gap-[10px]">
+              <WorkspaceSelector
+                workspaces={workspaces}
+                currentWorkspace={currentWorkspace}
+                onSwitchWorkspace={handleWorkspaceChange}
+                onCreateWorkspaceClick={handleCreateWorkspace}
+                canCreateWorkspace={user?.role === 'admin'}
+              />
+              {/* Workspace Settings Button (admin only) */}
+              {user?.role === 'admin' && currentWorkspace && (
+                <button
+                  type="button"
+                  aria-label="Workspace settings"
+                  onClick={() => router.push('/workspace/settings')}
+                  className="inline-flex items-center justify-center w-[40px] h-[40px] md:w-[44px] md:h-[44px] rounded-[10px] border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3a5afe]"
+                  title="Workspace settings"
+                >
+                  <Settings className="w-[18px] h-[18px] md:w-[20px] md:h-[20px] text-[#717182]" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+          {/* Search and Action Buttons Row */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-[10px] mt-[10px]">
+            {/* Search Input */}
+            <div className="flex-1 flex items-center gap-[10px] px-[10px] py-[10px] bg-[rgba(4,1,16,0.05)] rounded-[8px]">
+              <Search size={15} className="text-[#717182]" />
+              <Input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent border-none outline-none text-[14px] text-[#040110] font-['Inter'] placeholder:text-[rgba(4,1,16,0.6)] p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+            </div>
+
+            {/* Sort by Select */}
+            <Select value={sortOption} onValueChange={setSortOption}>
+              <SelectTrigger className="w-full md:w-[180px] bg-[rgba(4,1,16,0.05)] border-none font-['Inter'] text-[14px]">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent className="font-['Inter'] text-[14px]">
+                <SelectItem value="title-asc">Title (A-Z)</SelectItem>
+                <SelectItem value="title-desc">Title (Z-A)</SelectItem>
+                <SelectItem value="startDate-desc">Start Date (Newest)</SelectItem>
+                <SelectItem value="startDate-asc">Start Date (Oldest)</SelectItem>
+                <SelectItem value="endDate-desc">End Date (Newest)</SelectItem>
+                <SelectItem value="endDate-asc">End Date (Oldest)</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Add Project Button (visible to admin and workspace lead/owner) */}
+            {canAddProject() && (
+              <Button
+                onClick={() => setShowAddProjectModal(true)}
+                className="w-full md:w-auto bg-[#F2761B] hover:bg-[#F2761B]/90 text-white px-[15px] py-[10px] h-auto rounded-[8px] text-[14px] font-medium font-['Inter'] flex items-center justify-center gap-[10px]"
+              >
+                <Plus size={15} />
+                Add Project
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Projects Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(274px,1fr))] gap-[15px] mt-[20px] md:mt-[25px]">
+          {sortedProjects.map((project) => (
+            <ProjectCard
+              key={project._id}
+              project={{
+                ...project,
+                members: project.members.map((m) => ({
+                  userId: m.userId,
+                  addedAt: m.addedAt ?? new Date().toISOString(),
+                })),
+              }}
+              onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
+              onUpdated={fetchProjects}
+            />
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {sortedProjects.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-[100px]">
+            <p className="text-[16px] text-[#717182] font-['Inter']">No projects found</p>
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <AddProjectModal
+        open={showAddProjectModal}
+        onClose={() => setShowAddProjectModal(false)}
+        onProjectAdded={() => {
+          fetchProjects();
+          setShowAddProjectModal(false);
+        }}
+      />
+      <CreateWorkspaceModal
+        open={showCreateWorkspaceModal}
+        onClose={() => setShowCreateWorkspaceModal(false)}
+        onWorkspaceCreated={() => {
+          fetchWorkspaces();
+          setShowCreateWorkspaceModal(false);
+        }}
+      />
+    </>
+  );
+}
+
+export default ProjectsListView;

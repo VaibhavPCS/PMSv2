@@ -1,4 +1,4 @@
-const { CatchAsync } = require('@pms/error-handler');
+const { CatchAsync, APIError } = require('@pms/error-handler');
 const prisma = require('../config/prisma');
 
 const GetMyNotifications = CatchAsync(async (req, res) => {
@@ -32,10 +32,13 @@ const GetUnreadCount = CatchAsync(async (req, res) => {
 
 const MarkAsRead = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
-    await prisma.notification.updateMany({
+    const { count } = await prisma.notification.updateMany({
         where: { id: req.params.id, userId },
         data: { isRead: true },
     });
+    if (count === 0) {
+        throw new APIError(404, 'Notification not found');
+    }
     res.status(200).json({ status: 'success', data: null });
 });
 

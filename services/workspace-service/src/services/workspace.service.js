@@ -126,6 +126,16 @@ const TransferOwnership = async (workspaceId, currentOwnerId, newOwnerId) => {
   return workspace;
 };
 
+// Validate the caller is an active member of the target workspace. Active-workspace
+// scoping is driven client-side (localStorage + the workspace-id request header),
+// so this just authorizes the switch and echoes the id back.
+const SwitchWorkspace = async (userId, workspaceId) => {
+  if (!workspaceId) throw new APIError(400, 'workspaceId is required.');
+  const member = await _getActiveMember(workspaceId, userId);
+  if (!member) throw new APIError(403, "You don't have access to this workspace.");
+  return { workspaceId };
+};
+
 module.exports = {
   CreateWorkspace,
   GetMyWorkspaces,
@@ -133,4 +143,5 @@ module.exports = {
   UpdateWorkspace,
   DeleteWorkspace,
   TransferOwnership,
+  SwitchWorkspace,
 };

@@ -102,6 +102,19 @@ const PublishSprintDeleted = async (sprintId) => {
     });
 };
 
+const PublishTaskOverdue = async (taskId, projectId, workspaceId, assignees, dueDate) => {
+    const producer = await _getProducer();
+    await PublishEvent(producer, TOPICS.TASK_EVENTS, taskId, {
+        type: 'TASK_OVERDUE',
+        taskId,
+        projectId,
+        workspaceId,
+        assignees,
+        dueDate,
+        timestamp: new Date().toISOString(),
+    });
+};
+
 module.exports = {
     PublishTaskCreated,
     PublishTaskStatusChanged,
@@ -109,4 +122,5 @@ module.exports = {
     PublishTaskDeleted,
     PublishSprintCreated,
     PublishSprintDeleted,
+    PublishTaskOverdue,
 };

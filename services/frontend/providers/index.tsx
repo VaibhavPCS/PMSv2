@@ -1,14 +1,6 @@
 'use client';
 
-import { QueryProvider } from './QueryProvider';
-import { AuthProvider } from './AuthProvider';
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryProvider>
-      <AuthProvider>{children}</AuthProvider>
-    </QueryProvider>
-  );
-}
-
-export { useAuthContext } from './AuthProvider';
+export { Providers } from './Providers';
+export { AuthProvider, useAuth, useAuthContext } from './AuthProvider';
+export { BadgeProvider, useBadges } from './BadgeProvider';
+export { QueryProvider } from './QueryProvider';

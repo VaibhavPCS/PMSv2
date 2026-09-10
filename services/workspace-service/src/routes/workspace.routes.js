@@ -8,7 +8,8 @@ const { ValidateRequest, ValidateQuery, PaginationSchema, CreateWorkspaceSchema,
 
 const { CreateWorkspace, GetMyWorkspaces, GetWorkspace,
         UpdateWorkspace, DeleteWorkspace,
-        TransferOwnership }                          = require('../controllers/workspace.controller');
+        TransferOwnership, SwitchWorkspace,
+        WorkspaceExists }                            = require('../controllers/workspace.controller');
 
 const { GetMembers, RemoveMember, ChangeMemberRole,
         InviteMember, AcceptInvite,
@@ -63,6 +64,7 @@ const RevokeInviteSchema = z.object({
  *         description: Token already used or expired
  */
 Router.post('/accept-invite', AuthenticateToken, ValidateRequest(AcceptInviteSchema), AcceptInvite);
+Router.post('/switch', AuthenticateToken, SwitchWorkspace);
 
 // ─── Workspace CRUD ───────────────────────────────────────────────────────────
 
@@ -165,6 +167,7 @@ Router.get('/', AuthenticateToken, ValidateQuery(PaginationSchema), GetMyWorkspa
  *       404:
  *         $ref: '#/components/responses/NotFound'
  */
+Router.get('/:id/exists', AuthenticateToken, WorkspaceExists);
 Router.get('/:id', AuthenticateToken, GetWorkspace);
 
 /**

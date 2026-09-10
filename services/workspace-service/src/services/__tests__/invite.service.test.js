@@ -66,6 +66,26 @@ describe('InviteService.CreateInvite', () => {
       .rejects.toMatchObject({ statusCode: 400 });
   });
 
+  it('throws 400 when the requester tries to invite themselves (email known)', async () => {
+    prisma.workspaceMember.findFirst.mockResolvedValue(OWNER_MEMBER);
+    prisma.workspaceInvite.findFirst.mockResolvedValue(null);
+
+    await expect(
+      InviteService.CreateInvite('ws-1', 'Owner@test.com', 'member', 'user-1', 'owner@test.com')
+    ).rejects.toMatchObject({ statusCode: 400, message: 'You cannot invite yourself.' });
+  });
+
+  it('does NOT enforce the self-invite check when the email is null (lookup outage)', async () => {
+    prisma.workspaceMember.findFirst.mockResolvedValue(OWNER_MEMBER);
+    prisma.workspaceInvite.findFirst.mockResolvedValue(null);
+    prisma.workspaceInvite.create.mockResolvedValue(VALID_INVITE);
+
+    const result = await InviteService.CreateInvite('ws-1', 'owner@test.com', 'member', 'user-1', null);
+
+    expect(prisma.workspaceInvite.create).toHaveBeenCalled();
+    expect(result).toEqual(VALID_INVITE);
+  });
+
   it('throws 409 when an active invite already exists for the email', async () => {
     prisma.workspaceMember.findFirst.mockResolvedValue(OWNER_MEMBER);
     prisma.workspaceInvite.findFirst.mockResolvedValue({ id: 'existing' });
@@ -157,6 +177,36 @@ describe('InviteService.AcceptInvite', () => {
 
     await expect(InviteService.AcceptInvite('used-tok', 'user-99'))
       .rejects.toMatchObject({ statusCode: 410 });
+  });
+
+  it('throws 403 when the caller email does not match the invite recipient', async () => {
+    prisma.workspaceInvite.findUnique.mockResolvedValue(VALID_INVITE);
+
+    await expect(InviteService.AcceptInvite('tok-abc', 'user-99', 'someone-else@test.com'))
+      .rejects.toMatchObject({ statusCode: 403 });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('accepts when the caller email matches the invite recipient (case-insensitive)', async () => {
+    prisma.workspaceInvite.findUnique.mockResolvedValue(VALID_INVITE);
+    prisma.workspaceMember.upsert.mockResolvedValue({});
+    prisma.workspaceInvite.update.mockResolvedValue({});
+
+    await InviteService.AcceptInvite('tok-abc', 'user-99', 'BOB@test.com');
+
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(PublishMemberAdded).toHaveBeenCalledWith('ws-1', 'user-99', 'member');
+  });
+
+  it('does NOT enforce the recipient check when caller email is null (lookup outage)', async () => {
+    prisma.workspaceInvite.findUnique.mockResolvedValue(VALID_INVITE);
+    prisma.workspaceMember.upsert.mockResolvedValue({});
+    prisma.workspaceInvite.update.mockResolvedValue({});
+
+    await InviteService.AcceptInvite('tok-abc', 'user-99', null);
+
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 });
 

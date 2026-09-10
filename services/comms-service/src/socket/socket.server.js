@@ -1,5 +1,5 @@
 const { Server } = require('socket.io');
-const SuperTokens = require('supertokens-node');
+const Session = require('supertokens-node/recipe/session');
 const prisma = require('../config/prisma');
 
 const AttachSocket = (httpServer) => {
@@ -17,7 +17,7 @@ const AttachSocket = (httpServer) => {
 
     io.use(async (socket, next) => {
         try {
-            const session = await SuperTokens.getSession(
+            const session = await Session.getSession(
                 socket.request,
                 socket.request.res ?? {},
                 { sessionRequired: true },

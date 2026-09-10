@@ -22,6 +22,7 @@ jest.mock('../../services/auth.service');
 
 jest.mock('@pms/validators', () => ({
   ValidateRequest: () => (req, res, next) => next(),
+  PasswordSchema: { safeParse: () => ({ success: true }) },
 }));
 
 const request = require('supertest');

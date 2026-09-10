@@ -42,45 +42,59 @@ pipeline {
         stage('Inject Secrets') {
             steps {
                 echo '── Writing .env files from Jenkins credentials ──'
+                // Unified env: ONE root .env shared by all backend services
+                // (per-service PORT/DB_NAME are fixed in each service's index.js),
+                // plus the frontend's .env.local.
                 withCredentials([
-                    file(credentialsId: 'pms-root-env',         variable: 'ROOT_ENV'),
-                    file(credentialsId: 'pms-auth-env',         variable: 'AUTH_ENV'),
-                    file(credentialsId: 'pms-workspace-env',    variable: 'WORKSPACE_ENV'),
-                    file(credentialsId: 'pms-project-env',      variable: 'PROJECT_ENV'),
-                    file(credentialsId: 'pms-task-env',         variable: 'TASK_ENV'),
-                    file(credentialsId: 'pms-notification-env', variable: 'NOTIFICATION_ENV'),
-                    file(credentialsId: 'pms-workflow-env',     variable: 'WORKFLOW_ENV'),
-                    file(credentialsId: 'pms-comms-env',        variable: 'COMMS_ENV'),
-                    file(credentialsId: 'pms-files-env',        variable: 'FILES_ENV'),
-                    file(credentialsId: 'pms-meeting-env',      variable: 'MEETING_ENV')
+                    file(credentialsId: 'pms-root-env',     variable: 'ROOT_ENV'),
+                    file(credentialsId: 'pms-frontend-env', variable: 'FRONTEND_ENV')
                 ]) {
                     sh '''
-                        cp "$ROOT_ENV"         ${PROJECT_DIR}/.env
-                        cp "$AUTH_ENV"         ${PROJECT_DIR}/services/auth-service/.env
-                        cp "$WORKSPACE_ENV"    ${PROJECT_DIR}/services/workspace-service/.env
-                        cp "$PROJECT_ENV"      ${PROJECT_DIR}/services/project-service/.env
-                        cp "$TASK_ENV"         ${PROJECT_DIR}/services/task-service/.env
-                        cp "$NOTIFICATION_ENV" ${PROJECT_DIR}/services/notification-service/.env
-                        cp "$WORKFLOW_ENV"     ${PROJECT_DIR}/services/workflow-engine/.env
-                        cp "$COMMS_ENV"        ${PROJECT_DIR}/services/comms-service/.env
-                        cp "$FILES_ENV"        ${PROJECT_DIR}/services/file-services/.env
-                        cp "$MEETING_ENV"      ${PROJECT_DIR}/services/meeting-service/.env
-                        echo "All .env files injected."
+                        cp "$ROOT_ENV"     ${PROJECT_DIR}/.env
+                        cp "$FRONTEND_ENV" ${PROJECT_DIR}/services/frontend/.env.local
+                        echo "Unified root .env + frontend .env.local injected."
                     '''
                 }
             }
         }
 
-        // ─── 3. INSTALL DEPENDENCIES ────────────────────────────────────────
+        // ─── 3. INSTALL DEPENDENCIES (incremental, cached) ──────────────────
+        // Reuse a persistent node_modules cache that survives cleanWs(), and only
+        // reinstall when package-lock.json actually changed — big time saver, with
+        // guard-rails so we don't ship a stale tree. A nightly job should force a
+        // clean rebuild (touch ${NM_CACHE}/.force-clean) to flush any drift.
         stage('Install') {
+            environment {
+                NM_CACHE = '/home/jenkins/pms-cache/node_modules'
+                LOCK_HASH = '/home/jenkins/pms-cache/package-lock.sha256'
+            }
             steps {
-                echo '── Installing npm packages ──'
+                echo '── Installing npm packages (incremental) ──'
                 sh '''
                     export NVM_DIR="$HOME/.nvm"
                     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
                     nvm use ${NODE_VERSION}
+                    mkdir -p "$(dirname ${NM_CACHE})"
                     cd ${PROJECT_DIR}
-                    npm install
+
+                    # Warm the workspace from cache if present.
+                    if [ -d "${NM_CACHE}" ]; then
+                        echo "Restoring node_modules from cache…"
+                        cp -a "${NM_CACHE}" ./node_modules
+                    fi
+
+                    NEW_HASH="$(sha256sum package-lock.json | awk '{print $1}')"
+                    OLD_HASH="$(cat ${LOCK_HASH} 2>/dev/null || echo none)"
+
+                    if [ ! -d node_modules ] || [ "${NEW_HASH}" != "${OLD_HASH}" ] || [ -f "${NM_CACHE}/../.force-clean" ]; then
+                        echo "Lockfile changed (or forced) → npm install"
+                        npm install
+                        echo "${NEW_HASH}" > ${LOCK_HASH}
+                        rm -rf "${NM_CACHE}" && cp -a ./node_modules "${NM_CACHE}"
+                        rm -f "${NM_CACHE}/../.force-clean" || true
+                    else
+                        echo "Lockfile unchanged → skipping npm install (cache hit)"
+                    fi
                 '''
             }
         }
@@ -131,6 +145,8 @@ pipeline {
                     docker build -f services/comms-service/Dockerfile        -t ${REGISTRY}/pms-comms:${IMAGE_TAG}        -t ${REGISTRY}/pms-comms:latest        .
                     docker build -f services/file-services/Dockerfile        -t ${REGISTRY}/pms-files:${IMAGE_TAG}        -t ${REGISTRY}/pms-files:latest        .
                     docker build -f services/meeting-service/Dockerfile      -t ${REGISTRY}/pms-meeting:${IMAGE_TAG}      -t ${REGISTRY}/pms-meeting:latest      .
+                    docker build -f services/comment-service/Dockerfile      -t ${REGISTRY}/pms-comment:${IMAGE_TAG}      -t ${REGISTRY}/pms-comment:latest      .
+                    docker build -f services/frontend/Dockerfile             -t ${REGISTRY}/pms-frontend:${IMAGE_TAG}     -t ${REGISTRY}/pms-frontend:latest     .
                 '''
             }
         }
@@ -149,6 +165,8 @@ pipeline {
                     docker push ${REGISTRY}/pms-comms:${IMAGE_TAG}        && docker push ${REGISTRY}/pms-comms:latest
                     docker push ${REGISTRY}/pms-files:${IMAGE_TAG}        && docker push ${REGISTRY}/pms-files:latest
                     docker push ${REGISTRY}/pms-meeting:${IMAGE_TAG}      && docker push ${REGISTRY}/pms-meeting:latest
+                    docker push ${REGISTRY}/pms-comment:${IMAGE_TAG}      && docker push ${REGISTRY}/pms-comment:latest
+                    docker push ${REGISTRY}/pms-frontend:${IMAGE_TAG}     && docker push ${REGISTRY}/pms-frontend:latest
                 '''
             }
         }
@@ -200,6 +218,8 @@ pipeline {
                       ${KUBECTL} rollout status deployment/pms-comms         -n ${NAMESPACE} --timeout=120s
                       ${KUBECTL} rollout status deployment/pms-files         -n ${NAMESPACE} --timeout=120s
                       ${KUBECTL} rollout status deployment/pms-meeting       -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-comment       -n ${NAMESPACE} --timeout=120s
+                      ${KUBECTL} rollout status deployment/pms-frontend      -n ${NAMESPACE} --timeout=120s
                     fi
                 '''
             }
@@ -226,6 +246,8 @@ pipeline {
                     curl -sf ${BASE}/api/v1/chats/           && echo "comms-service OK"         || { echo "comms-service DOWN";         FAILED=1; }
                     curl -sf ${BASE}/api/v1/files/           && echo "file-service OK"          || { echo "file-service DOWN";          FAILED=1; }
                     curl -sf ${BASE}/api/v1/meetings/        && echo "meeting-service OK"       || { echo "meeting-service DOWN";       FAILED=1; }
+                    curl -sf ${BASE}/api/v1/comments/        && echo "comment-service OK"       || { echo "comment-service DOWN";       FAILED=1; }
+                    curl -sf ${BASE}/                        && echo "frontend OK"              || { echo "frontend DOWN";              FAILED=1; }
                     curl -sf ${BASE}/dev                     && echo "API portal OK"            || { echo "API portal DOWN";            FAILED=1; }
 
                     [ $FAILED -eq 0 ] || { echo "One or more services failed health check"; exit 1; }
@@ -247,8 +269,10 @@ pipeline {
             sh '${KUBECTL} get pods -n pms || true'
         }
         always {
-            // Clean up injected .env files before workspace wipe
-            sh 'rm -f ${PROJECT_DIR}/.env ${PROJECT_DIR}/services/*/.env || true'
+            // Clean up injected secrets before workspace wipe (unified root .env +
+            // frontend .env.local). The persistent node_modules cache at
+            // /home/jenkins/pms-cache survives cleanWs() and is reused next build.
+            sh 'rm -f ${PROJECT_DIR}/.env ${PROJECT_DIR}/services/frontend/.env.local || true'
             cleanWs()
         }
     }

@@ -38,6 +38,21 @@ const TransferOwnership = CatchAsync(async (req, res) => {
   res.status(200).json({ status: 'success', data: workspace });
 });
 
+const SwitchWorkspace = CatchAsync(async (req, res) => {
+  const userId = req.session.getUserId();
+  const data   = await WorkspaceService.SwitchWorkspace(userId, req.body.workspaceId);
+  res.status(200).json({ status: 'success', data });
+});
+
+// Lightweight existence + access check. GetWorkspaceById throws 404 if the
+// workspace is gone and 403 if the caller isn't a member, which the frontend
+// existence check already handles.
+const WorkspaceExists = CatchAsync(async (req, res) => {
+  const userId    = req.session.getUserId();
+  const workspace = await WorkspaceService.GetWorkspaceById(req.params.id, userId);
+  res.status(200).json({ status: 'success', data: { exists: true, workspace } });
+});
+
 module.exports = {
   CreateWorkspace,
   GetMyWorkspaces,
@@ -45,4 +60,6 @@ module.exports = {
   UpdateWorkspace,
   DeleteWorkspace,
   TransferOwnership,
+  SwitchWorkspace,
+  WorkspaceExists,
 };

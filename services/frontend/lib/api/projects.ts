@@ -1,64 +1,108 @@
-import type {
-  ApiResponse,
-  PaginatedResponse,
-  Project,
-  ProjectMember,
-} from '@shared/types';
-import { getRequest, postRequest, putRequest, patchRequest, deleteRequest } from './client';
+// Project endpoint module. Endpoints ported VERBATIM from OLD app.
+// NOTE the OLD backend mixes singular `/project` (list/detail/role/tasks) and
+// plural `/projects` (members/attachments/change-head) — preserved exactly.
 
-const BASE = '/projects';
+import {
+  getRequest,
+  postRequest,
+  putRequest,
+  deleteRequest,
+  postMultipart,
+} from './client';
+import type {
+  Project,
+  ProjectResponse,
+  TaskListResponse,
+  MembersResponse,
+} from '@/types';
 
 export interface CreateProjectPayload {
-  name: string;
+  title?: string;
+  name?: string;
   description?: string;
-  workspaceId: string;
+  workspaceId?: string;
   startDate?: string;
   endDate?: string;
+  [key: string]: unknown;
 }
 
 export interface UpdateProjectPayload {
+  title?: string;
   name?: string;
   description?: string;
-  status?: Project['status'];
+  status?: string;
   startDate?: string;
   endDate?: string;
+  [key: string]: unknown;
 }
 
 export const projectsApi = {
-  getAll: (workspaceId: string, page = 1, limit = 20) =>
-    getRequest<PaginatedResponse<Project>>(
-      `${BASE}?workspaceId=${workspaceId}&page=${page}&limit=${limit}`
+  // GET /project  (optionally scoped by workspace)
+  getAll: (workspaceId?: string) =>
+    getRequest<ProjectResponse>(
+      workspaceId ? `/project?workspace=${workspaceId}` : '/project'
     ),
 
-  getById: (id: string) =>
-    getRequest<ApiResponse<Project>>(`${BASE}/${id}`),
+  // GET /project/recent?...
+  getRecent: (params?: string) =>
+    getRequest<ProjectResponse>(
+      params ? `/project/recent?${params}` : '/project/recent?limit=1000'
+    ),
 
+  // GET /project/members
+  getAllMembers: () => getRequest<MembersResponse>('/project/members'),
+
+  // GET /project/:id
+  getById: (projectId: string) =>
+    getRequest<{ success?: boolean; data?: Project } & Partial<Project>>(
+      `/project/${projectId}`
+    ),
+
+  // GET /project/:id/role
+  getRole: (projectId: string) =>
+    getRequest<{ success?: boolean; role?: string; data?: { role?: string } }>(
+      `/project/${projectId}/role`
+    ),
+
+  // GET /project/:id/tasks
+  getTasks: (projectId: string) =>
+    getRequest<TaskListResponse>(`/project/${projectId}/tasks`),
+
+  // GET /project/:id/assignable-members
+  getAssignableMembers: (projectId: string) =>
+    getRequest<MembersResponse>(`/project/${projectId}/assignable-members`),
+
+  // POST /workspace (create handled in workspacesApi). Project create is
+  // performed via task/excel flows in the OLD app; expose generic create here.
   create: (payload: CreateProjectPayload) =>
-    postRequest<ApiResponse<Project>>(BASE, payload),
+    postRequest<{ success?: boolean; data?: Project }>('/project', payload),
 
-  update: (id: string, payload: UpdateProjectPayload) =>
-    putRequest<ApiResponse<Project>>(`${BASE}/${id}`, payload),
+  // PUT /project/:id
+  update: (projectId: string, payload: UpdateProjectPayload) =>
+    putRequest<{ success?: boolean; data?: Project }>(`/project/${projectId}`, payload),
 
-  updateStatus: (id: string, status: Project['status']) =>
-    patchRequest<ApiResponse<Project>>(`${BASE}/${id}/status`, { status }),
+  // PUT /project/:id  with { status }
+  updateStatus: (projectId: string, status: string) =>
+    putRequest<{ success?: boolean; data?: Project }>(`/project/${projectId}`, { status }),
 
-  delete: (id: string) =>
-    deleteRequest<ApiResponse<null>>(`${BASE}/${id}`),
+  // DELETE /project/:id
+  remove: (projectId: string) =>
+    deleteRequest<{ success?: boolean }>(`/project/${projectId}`),
 
-  archive: (id: string) =>
-    patchRequest<ApiResponse<Project>>(`${BASE}/${id}/archive`, {}),
+  // POST /projects/:id/change-head  with { newHeadId }
+  changeHead: (projectId: string, newHeadId: string) =>
+    postRequest<{ success?: boolean }>(`/projects/${projectId}/change-head`, { newHeadId }),
 
-  getMembers: (id: string) =>
-    getRequest<ApiResponse<ProjectMember[]>>(`${BASE}/${id}/members`),
+  // POST /projects/:id/attachments  (multipart)
+  uploadAttachment: (projectId: string, formData: FormData) =>
+    postMultipart<{ success?: boolean; data?: unknown }>(
+      `/projects/${projectId}/attachments`,
+      formData
+    ),
 
-  addMember: (id: string, userId: string, role: ProjectMember['role']) =>
-    postRequest<ApiResponse<ProjectMember>>(`${BASE}/${id}/members`, { userId, role }),
-
-  removeMember: (id: string, userId: string) =>
-    deleteRequest<ApiResponse<null>>(`${BASE}/${id}/members`, { userId }),
-
-  getArchived: (workspaceId: string) =>
-    getRequest<PaginatedResponse<Project>>(
-      `${BASE}/archived?workspaceId=${workspaceId}`
+  // DELETE /projects/:id/attachments/:attachmentId
+  deleteAttachment: (projectId: string, attachmentId: string) =>
+    deleteRequest<{ success?: boolean }>(
+      `/projects/${projectId}/attachments/${attachmentId}`
     ),
 };

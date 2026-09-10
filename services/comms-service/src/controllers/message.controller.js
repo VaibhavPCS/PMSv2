@@ -60,6 +60,12 @@ const MarkAsRead = CatchAsync(async (req, res) => {
     res.status(200).json({ status: 'success', data: null });
 });
 
+const MarkChatAsRead = CatchAsync(async (req, res) => {
+    const userId = req.session.getUserId();
+    const result = await MessageService.MarkChatAsRead(req.params.chatId, userId);
+    res.status(200).json({ status: 'success', data: result });
+});
+
 const GetUnreadCount = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
     const count  = await MessageService.GetUnreadCount(userId);
@@ -68,5 +74,5 @@ const GetUnreadCount = CatchAsync(async (req, res) => {
 
 module.exports = {
     SendMessage, GetMessages, EditMessage, DeleteMessage,
-    AddReaction, RemoveReaction, MarkAsRead, GetUnreadCount,
+    AddReaction, RemoveReaction, MarkAsRead, MarkChatAsRead, GetUnreadCount,
 };

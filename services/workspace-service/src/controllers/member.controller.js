@@ -1,6 +1,7 @@
 const { CatchAsync }   = require('@pms/error-handler');
 const MemberService    = require('../services/member.service');
 const InviteService    = require('../services/invite.service');
+const AuthClient       = require('../clients/auth.client');
 
 const GetMembers = CatchAsync(async (req, res) => {
   const requesterId = req.session.getUserId();
@@ -28,13 +29,15 @@ const ChangeMemberRole = CatchAsync(async (req, res) => {
 const InviteMember = CatchAsync(async (req, res) => {
   const requesterId     = req.session.getUserId();
   const { email, role } = req.body;
-  const invite          = await InviteService.CreateInvite(req.params.id, email, role, requesterId);
+  const requesterEmail  = await AuthClient.GetUserEmail(requesterId);
+  const invite          = await InviteService.CreateInvite(req.params.id, email, role, requesterId, requesterEmail);
   res.status(201).json({ status: 'success', data: { id: invite.id, email, role, expiresAt: invite.expiresAt } });
 });
 
 const AcceptInvite = CatchAsync(async (req, res) => {
-  const userId = req.session.getUserId();
-  await InviteService.AcceptInvite(req.body.token, userId);
+  const userId      = req.session.getUserId();
+  const callerEmail = await AuthClient.GetUserEmail(userId);
+  await InviteService.AcceptInvite(req.body.token, userId, callerEmail);
   res.status(200).json({ status: 'success', message: 'Invite accepted.' });
 });
 

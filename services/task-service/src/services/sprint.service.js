@@ -124,6 +124,16 @@ const UpdateSprint = async (sprintId, { name, goal, startDate, endDate }, userId
 
     _validateDates(newStart, newEnd);
     await _checkProjectEndDate(sprint.projectId, newEnd);
+
+    if (endDate && newEnd < sprint.endDate) {
+        const overrunning = await prisma.task.count({
+            where: { sprintId, isActive: true, dueDate: { gt: newEnd } },
+        });
+        if (overrunning > 0) {
+            throw new APIError(400, 'Cannot shorten sprint end date: some tasks are due after the new end date.');
+        }
+    }
+
     if (endDate && new Date(endDate) > sprint.endDate) {
         await prisma.task.updateMany({
             where: { sprintId, isFlagged: true, flagReason: FLAG_REASONS.SPRINT_EXPIRED },
@@ -145,6 +155,13 @@ const UpdateSprint = async (sprintId, { name, goal, startDate, endDate }, userId
 const DeleteSprint = async (sprintId, userId) => {
     _requireAuthenticatedUser(userId);
     await _fetchSprint(sprintId);
+
+    const activeTaskCount = await prisma.task.count({
+        where: { sprintId, isActive: true },
+    });
+    if (activeTaskCount > 0) {
+        throw new APIError(400, 'Cannot delete sprint with active tasks');
+    }
 
     const [, deletedSprint] = await prisma.$transaction([
         prisma.task.updateMany({

@@ -1,26 +1,490 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@custom-variant dark (&:is(.dark *));
+
+/* Custom xs breakpoint for very small screens (375px+) */
+@custom-variant xs (@media (min-width: 375px));
+
+@theme {
+  --font-sans: "Inter", "Work Sans", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+html,
+body {
+  @apply bg-[#F9F9F9] dark:bg-gray-950;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  @media (prefers-color-scheme: dark) {
+    color-scheme: dark;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.704 0.04 256.788);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
+
+  /* Figma Design Colors */
+  --primary-orange: #FF6B2C;
+  --text-tertiary: #a1a1a1;
+  --border-light: #f5f5f5;
+  --status-ongoing: #3B82F6;
+  --priority-high: #DC2626;
+}
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Radix UI z-index hierarchy */
+[data-radix-portal] {
+  z-index: 50 !important;
+}
+
+[role="dialog"] {
+  z-index: 60 !important;
+  /* position: fixed !important; */
+}
+
+.dialog-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  z-index: 50 !important;
+}
+
+/* Ensure dropdown and select content appear above dialogs */
+[data-slot="dropdown-menu-content"],
+[data-slot="select-content"] {
+  z-index: 70 !important;
+}
+
+/* Custom Scrollbar Styling - Figma Design */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--border-light);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #717182;
+}
+
+/* Apply to ScrollArea components */
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
+  background: var(--border-light);
+  border-radius: 2px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 2px;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
+  background: #717182;
+}
+
+/* Visible Scrollbar Styling */
+.scrollbar-visible::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 3px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: #717182;
+}
+
+/* Fully hidden scrollbar (still scrollable) */
+.scrollbar-hide {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;                  /* Chrome/Safari */
+  width: 0;
+  height: 0;
+}
+
+@media (min-width: 350px) {
+  [data-slot="scroll-area-viewport"].scrollbar-visible::-webkit-scrollbar {
+    display: initial !important;
+  }
+}
+
+/* Task Card Scrollbar Styling */
+.task-card-scrollbar::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.task-card-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+}
+
+.task-card-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+}
+
+.task-card-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.task-card-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
+/* ============================================================ */
+/* Date Picker Size Reduction and Scrollbar Overrides           */
+/* (ported from app/styles/date-picker-overrides.css)           */
+/* ============================================================ */
+
+/* Target date picker buttons with specific classes */
+button[data-slot="popover-trigger"][class*="h-[44px]"] {
+  height: 35px !important; /* 44px * 0.8 = 35.2px */
+  padding: 6px 11px !important; /* Reduced px-[14px] py-[8px] by 20% */
+  border-radius: 6px !important; /* Reduced rounded-[8px] by 20% */
+  font-size: 11px !important; /* Reduced text-[14px] by ~20% */
+}
+
+/* Calendar icon size reduction */
+button[data-slot="popover-trigger"][class*="h-[44px]"] svg {
+  width: 16px !important; /* Reduced from default size */
+  height: 16px !important; /* Reduced from default size */
+  margin-right: 6px !important; /* Reduced mr-2 by 20% */
+}
+
+/* Calendar popover size reduction */
+.date-picker-calendar {
+  max-height: 280px !important; /* Reduced default height */
+  overflow-y: auto !important; /* Add vertical scrollbar when needed */
+}
+
+/* Calendar header and cell size reduction */
+.date-picker-calendar .rdp-month_caption {
+  height: 28px !important; /* Reduced from default */
+  font-size: 12px !important; /* Reduced caption font size */
+}
+
+.date-picker-calendar .rdp-day {
+  width: 32px !important; /* Reduced day cell size */
+  height: 32px !important; /* Reduced day cell size */
+  font-size: 11px !important; /* Reduced day number font size */
+}
+
+/* Weekday header size reduction */
+.date-picker-calendar .rdp-weekday {
+  font-size: 10px !important; /* Reduced weekday font size */
+  padding: 4px !important; /* Reduced weekday padding */
+}
+
+/* Scrollbar styling for calendar */
+.date-picker-calendar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.date-picker-calendar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.date-picker-calendar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.date-picker-calendar::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* For Firefox */
+.date-picker-calendar {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Ensure calendar doesn't overflow container */
+.date-picker-container {
+  max-height: 320px;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* Calendar popover container with scrollbar */
+[data-radix-popover-content] {
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Scrollbar styling for calendar popover */
+[data-radix-popover-content]::-webkit-scrollbar {
+  width: 6px;
+}
+
+[data-radix-popover-content]::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+[data-radix-popover-content]::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+[data-radix-popover-content]::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Calendar component specific reductions */
+.rdp-month {
+  max-height: 300px !important;
+  overflow-y: auto !important;
+}
+
+.rdp-month_caption {
+  height: 28px !important;
+  font-size: 12px !important;
+}
+
+.rdp-day {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 11px !important;
+}
+
+.rdp-weekday {
+  font-size: 10px !important;
+  padding: 4px !important;
+}
+
+/* Specific overrides for Tailwind classes seen in the HTML */
+button[data-slot="popover-trigger"].h-\[44px\] {
+  height: 35px !important;
+}
+
+button[data-slot="popover-trigger"].px-\[14px\] {
+  padding-left: 11px !important;
+  padding-right: 11px !important;
+}
+
+button[data-slot="popover-trigger"].py-\[8px\] {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+button[data-slot="popover-trigger"].rounded-\[8px\] {
+  border-radius: 6px !important;
+}
+
+button[data-slot="popover-trigger"].text-\[14px\] {
+  font-size: 11px !important;
+}
+
+/* ============================================================ */
+/* End date-picker overrides                                    */
+/* ============================================================ */
+
+/* Chat Sidebar Scrollbar */
+.chat-sidebar-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+.chat-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #cccccc;
+  border-radius: 2px;
+}
+
+/* TipTap Rich Text Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror p {
+  margin: 0;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #a1a1a1;
+  float: left;
+  pointer-events: none;
+  height: 0;
+}
+
+/* TipTap formatting styles */
+.ProseMirror strong {
+  font-weight: 600;
+}
+
+.ProseMirror em {
+  font-style: italic;
+}
+
+.ProseMirror u {
+  text-decoration: underline;
+}
+
+/* Message content HTML formatting */
+.message-content strong {
+  font-weight: 600;
+}
+
+.message-content em {
+  font-style: italic;
+}
+
+.message-content u {
+  text-decoration: underline;
+}
+
+.message-content p {
+  margin: 0;
 }

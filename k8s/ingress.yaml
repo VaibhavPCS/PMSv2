@@ -80,6 +80,13 @@ spec:
             name: pms-task
             port:
               number: 4004
+      - path: /api/v1/imports/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-task
+            port:
+              number: 4004
       - path: /api/v1/notifications/
         pathType: Prefix
         backend:
@@ -150,3 +157,26 @@ spec:
             name: pms-meeting
             port:
               number: 4009
+      - path: /api/v1/comments/
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-comment
+            port:
+              number: 4010
+      - path: /api/v1/comments/docs
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-comment
+            port:
+              number: 4010
+      # Catch-all: everything not matched above (the browser app) → frontend.
+      # Keep this LAST so the /api/v1/* service routes take precedence.
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: pms-frontend
+            port:
+              number: 3000

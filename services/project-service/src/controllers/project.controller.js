@@ -1,4 +1,4 @@
-const { CatchAsync }   = require('@pms/error-handler');
+const { CatchAsync, APIError } = require('@pms/error-handler');
 const ProjectService   = require('../services/project.service');
 
 const CreateProject = CatchAsync(async (req, res) => {
@@ -9,9 +9,26 @@ const CreateProject = CatchAsync(async (req, res) => {
 
 const GetProjects = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
-    const { workspaceId, page, limit } = req.query;
+    const { page, limit } = req.query;
+    // The frontend sends the active workspace in the 'workspace-id' header; the
+    // ?workspaceId= query param is an explicit override.
+    const workspaceId = req.query.workspaceId || req.headers['workspace-id'];
     const projects = await ProjectService.GetProjects(workspaceId, userId, { page, limit });
     res.status(200).json(projects);
+});
+
+const GetRecentProjects = CatchAsync(async (req, res) => {
+    const userId = req.session.getUserId();
+    // workspaceId comes from the 'workspace-id' header (injected by the frontend
+    // api client); the ?workspaceId= query param is an explicit override/fallback.
+    // ValidateQuery has already replaced req.query with parsed data, so the header
+    // must be read straight off req.headers here.
+    const workspaceId = req.query.workspaceId || req.headers['workspace-id'];
+    if (!workspaceId) throw new APIError(400, 'workspace-id is required');
+
+    const { page, limit, sortBy } = req.query;
+    const projects = await ProjectService.GetRecentProjects(workspaceId, userId, { page, limit, sortBy });
+    res.status(200).json({ projects });
 });
 
 const GetProject = CatchAsync(async (req, res) => {
@@ -41,6 +58,7 @@ const ExtendProjectDeadline = CatchAsync(async (req, res) => {
 module.exports = {
     CreateProject,
     GetProjects,
+    GetRecentProjects,
     GetProject,
     UpdateProject,
     DeleteProject,

@@ -63,6 +63,9 @@ jest.mock('../config/prisma', () => ({
 // Swagger / config stubs
 jest.mock('../config/swagger', () => ({}), { virtual: true });
 
+// Real @pms/validators is used so ValidateParams enforces UUID ids; the
+// controller test relies on its 422 behaviour for non-UUID notification ids.
+
 // ---------------------------------------------------------------------------
 
 const request = require('supertest');
@@ -257,30 +260,42 @@ describe('Notification Controller', () => {
   // -------------------------------------------------------------------------
 
   describe('PATCH /api/v1/notifications/:id/read', () => {
+    const NOTIF_ID = '11111111-1111-4111-8111-111111111111';
+    const OTHER_ID = '22222222-2222-4222-8222-222222222222';
+    const MISSING_ID = '33333333-3333-4333-8333-333333333333';
+
     it('marks a notification as read for the authenticated user', async () => {
       prisma.notification.updateMany.mockResolvedValue({ count: 1 });
 
       const res = await request(App)
-        .patch(`${BASE}/notif-1/read`)
+        .patch(`${BASE}/${NOTIF_ID}/read`)
         .expect(200);
 
       expect(res.body.status).toBe('success');
       expect(res.body.data).toBeNull();
 
       expect(prisma.notification.updateMany).toHaveBeenCalledWith({
-        where: { id: 'notif-1', userId: 'user-test-id' },
+        where: { id: NOTIF_ID, userId: 'user-test-id' },
         data: { isRead: true },
       });
     });
 
-    it('cannot mark another user\'s notification as read (where clause scopes by userId)', async () => {
-      // updateMany with non-matching userId returns count=0, which is silently
-      // accepted (no error thrown) — the controller trusts the DB scope.
+    it('rejects a non-UUID notification id with 422', async () => {
+      const res = await request(App)
+        .patch(`${BASE}/notif-1/read`)
+        .expect(422);
+
+      expect(res.body.status).toBe('fail');
+      expect(prisma.notification.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 when marking another user\'s notification (count=0 from userId scope)', async () => {
+      // updateMany with non-matching userId returns count=0 -> 404.
       prisma.notification.updateMany.mockResolvedValue({ count: 0 });
 
       const res = await request(App)
-        .patch(`${BASE}/other-user-notif/read`)
-        .expect(200);
+        .patch(`${BASE}/${OTHER_ID}/read`)
+        .expect(404);
 
       // Verify the controller always passes the session userId in the where clause
       expect(prisma.notification.updateMany).toHaveBeenCalledWith(
@@ -288,17 +303,17 @@ describe('Notification Controller', () => {
           where: expect.objectContaining({ userId: 'user-test-id' }),
         })
       );
-      expect(res.body.status).toBe('success');
+      expect(res.body.status).toBe('fail');
     });
 
-    it('still responds 200 when the notification id does not exist', async () => {
+    it('responds 404 when the notification id does not exist', async () => {
       prisma.notification.updateMany.mockResolvedValue({ count: 0 });
 
       const res = await request(App)
-        .patch(`${BASE}/non-existent-id/read`)
-        .expect(200);
+        .patch(`${BASE}/${MISSING_ID}/read`)
+        .expect(404);
 
-      expect(res.body.status).toBe('success');
+      expect(res.body.status).toBe('fail');
     });
   });
 

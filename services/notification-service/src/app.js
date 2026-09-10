@@ -53,7 +53,9 @@ if (process.env.NODE_ENV !== 'production' || process.env.DOCS_ENABLED === 'true'
   );
 }
 
-const ApiLimiter = RateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
+// The SPA polls notifications from several panels; 100/15min trips 429s under
+// normal use. Keep a generous runaway-loop backstop instead.
+const ApiLimiter = RateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false });
 App.use('/api/v1/notifications', ApiLimiter, NotificationRoutes);
 
 App.use(errorHandler());

@@ -1,5 +1,7 @@
 import axios from 'axios';
 import type { InternalAxiosRequestConfig, AxiosError, AxiosResponse } from 'axios';
+import { mapApiPath } from './path-map';
+import { normalizeIds } from './normalize-ids';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
 
@@ -9,6 +11,8 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Translate old-monolith resource paths to the new /api/v1 gateway contract.
+  if (config.url) config.url = mapApiPath(config.url);
   if (typeof window !== 'undefined') {
     const workspaceId = localStorage.getItem('currentWorkspaceId');
     if (workspaceId && config.headers) {
@@ -19,7 +23,14 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    // Additively inject `_id` from the backend's `id` so the ported frontend's
+    // _id-based keys / URL building / nested reads keep working.
+    if (response.data && typeof response.data === 'object') {
+      response.data = normalizeIds(response.data);
+    }
+    return response;
+  },
   (error: AxiosError) => {
     if (typeof window !== 'undefined') {
       if (error.response?.status === 401) {

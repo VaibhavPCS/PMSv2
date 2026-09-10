@@ -27,3 +27,15 @@ model File {
   @@index([uploadedBy, createdAt])
   @@map("files")
 }
+
+
+model WorkspaceMemberCache {
+  workspaceId String
+  userId      String
+  role        String
+  updatedAt   DateTime @updatedAt
+
+  @@id([workspaceId, userId])
+  @@index([workspaceId])
+  @@map("workspace_member_cache")
+}

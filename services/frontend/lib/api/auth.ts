@@ -1,30 +1,47 @@
-import type { ApiResponse, AuthResponse, LoginPayload, RegisterPayload, User } from '@shared/types';
-import { getRequest, postRequest } from './client';
+// Auth endpoint module. Ported from OLD app/hooks/use-auth.ts + auth-context.
+// Endpoints match the OLD app EXACTLY (singular /auth/*). Replaces the
+// supertokens-based scaffold version so the ported screens keep their call
+// sites identical.
 
-const BASE = '/auth';
+import { getRequest, postRequest } from './client';
+import { stSignIn, stSignUp, stSignOut } from './supertokens-auth';
+import type { ApiEnvelope, User } from '@/types';
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword?: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
 
 export const authApi = {
-  login: (payload: LoginPayload) =>
-    postRequest<ApiResponse<AuthResponse>>(`${BASE}/login`, payload),
+  register: (data: RegisterPayload) => stSignUp(data.email, data.password, data.name),
 
-  register: (payload: RegisterPayload) =>
-    postRequest<ApiResponse<AuthResponse>>(`${BASE}/register`, payload),
+  verifyEmail: (data: { token: string }) => postRequest<any>('/auth/user/email/verify', data),
 
-  logout: () =>
-    postRequest<ApiResponse<null>>(`${BASE}/logout`, {}),
+  login: (data: LoginPayload) => stSignIn(data.email, data.password),
 
-  me: () =>
-    getRequest<ApiResponse<User>>(`${BASE}/me`),
+  verifyOtp: (data: { userId: string; otp: string; type?: string }) =>
+    postRequest<any>('/auth/verify-otp', {
+      token: { userId: data.userId, otp: data.otp },
+    }),
 
-  refreshToken: () =>
-    postRequest<ApiResponse<{ accessToken: string }>>(`${BASE}/refresh`, {}),
+  resendOtp: (data: { userId: string }) => postRequest<any>('/auth/resend-otp', data),
 
-  verifyEmail: (token: string) =>
-    postRequest<ApiResponse<null>>(`${BASE}/verify-email`, { token }),
+  forgotPassword: (data: { email: string }) => postRequest<any>('/auth/forgot-password', data),
 
-  forgotPassword: (email: string) =>
-    postRequest<ApiResponse<null>>(`${BASE}/forgot-password`, { email }),
+  verifyResetOtp: (data: { userId: string; otp: string }) =>
+    postRequest<any>('/auth/verify-reset-otp', data),
 
-  resetPassword: (token: string, password: string) =>
-    postRequest<ApiResponse<null>>(`${BASE}/reset-password`, { token, password }),
+  resetPassword: (data: { userId: string; resetToken: string; newPassword: string }) =>
+    postRequest<any>('/auth/reset-password', data),
+
+  me: () => getRequest<ApiEnvelope<User> & { user?: User }>('/api/v1/auth/me'),
+
+  logout: () => stSignOut(),
 };

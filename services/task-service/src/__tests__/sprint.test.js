@@ -35,6 +35,7 @@ const mockPrisma = {
   task: {
     findMany: jest.fn(),
     updateMany: jest.fn(),
+    count: jest.fn(),
   },
   projectEndDateCache: {
     findUnique: jest.fn(),
@@ -127,21 +128,21 @@ describe('POST /api/v1/sprints — CreateSprint', () => {
     expect(res.status).toBe(201);
   });
 
-  it('400 — startDate must be before endDate', async () => {
+  it('422 — startDate must be before endDate (schema-level)', async () => {
     const res = await request(app)
       .post('/api/v1/sprints')
       .send({ ...validBody, startDate: future(14), endDate: future(1) });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
-  it('400 — equal startDate and endDate is rejected', async () => {
+  it('422 — equal startDate and endDate is rejected (schema-level)', async () => {
     const same = future(7);
     const res = await request(app)
       .post('/api/v1/sprints')
       .send({ ...validBody, startDate: same, endDate: same });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it('400 — sprint endDate cannot exceed cached project endDate', async () => {
@@ -238,7 +239,18 @@ describe('PATCH /api/v1/sprints/:id — UpdateSprint', () => {
     mockPrisma.sprint.findUnique.mockResolvedValue(makeSprint());
     mockPrisma.projectEndDateCache.findUnique.mockResolvedValue(null);
     mockPrisma.task.updateMany.mockResolvedValue({ count: 0 });
+    mockPrisma.task.count.mockResolvedValue(0);
     mockPrisma.sprint.update.mockResolvedValue(makeSprint({ name: 'Sprint Updated' }));
+  });
+
+  it('400 — shrinking endDate is rejected when a task is due after the new end', async () => {
+    mockPrisma.task.count.mockResolvedValue(1);
+
+    const res = await request(app)
+      .patch(`/api/v1/sprints/${SPRINT_ID}`)
+      .send({ endDate: future(7) });
+
+    expect(res.status).toBe(400);
   });
 
   it('200 — updates sprint name', async () => {
@@ -268,12 +280,12 @@ describe('PATCH /api/v1/sprints/:id — UpdateSprint', () => {
     );
   });
 
-  it('400 — new dates must not be invalid (start >= end)', async () => {
+  it('422 — new dates must not be invalid (start >= end, schema-level)', async () => {
     const res = await request(app)
       .patch(`/api/v1/sprints/${SPRINT_ID}`)
       .send({ startDate: future(20), endDate: future(5) });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it('400 — extended endDate must not exceed project endDate cache', async () => {
@@ -307,6 +319,7 @@ describe('DELETE /api/v1/sprints/:id — DeleteSprint', () => {
     mockTransaction();
     mockPrisma.sprint.findUnique.mockResolvedValue(makeSprint());
     mockPrisma.task.updateMany.mockResolvedValue({ count: 0 });
+    mockPrisma.task.count.mockResolvedValue(0);
     mockPrisma.sprint.update.mockResolvedValue(makeSprint({ isActive: false }));
   });
 
@@ -338,5 +351,12 @@ describe('DELETE /api/v1/sprints/:id — DeleteSprint', () => {
 
     const res = await request(app).delete(`/api/v1/sprints/${SPRINT_ID}`);
     expect(res.status).toBe(404);
+  });
+
+  it('400 — cannot delete sprint with active tasks', async () => {
+    mockPrisma.task.count.mockResolvedValue(3);
+
+    const res = await request(app).delete(`/api/v1/sprints/${SPRINT_ID}`);
+    expect(res.status).toBe(400);
   });
 });

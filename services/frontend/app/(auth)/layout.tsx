@@ -1,24 +1,30 @@
+'use client';
+
+import { useAuth } from '@/hooks/use-auth';
+
+/**
+ * Auth route-group layout.
+ *
+ * Ported from the old <AuthLayout /> (app/routes/auth/auth-layout.tsx):
+ * - Shows a centered loading state while auth is resolving.
+ * - Redirects already-authenticated users to /dashboard.
+ * - Otherwise renders the page (each auth page owns its own AuthPanelLayout,
+ *   so this layout is a transparent pass-through for the markup).
+ */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-label="PMS Logo">
-              <rect x="3" y="3" width="8" height="8" rx="1.5" fill="white" />
-              <rect x="13" y="3" width="8" height="8" rx="1.5" fill="white" opacity="0.7" />
-              <rect x="3" y="13" width="8" height="8" rx="1.5" fill="white" opacity="0.7" />
-              <rect x="13" y="13" width="8" height="8" rx="1.5" fill="white" opacity="0.4" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">PMS</h1>
-          <p className="text-sm text-gray-500 mt-1">Project Management System</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          {children}
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Show loading state with proper styling
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-orange-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Authenticating...</p>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <div>{children}</div>;
 }

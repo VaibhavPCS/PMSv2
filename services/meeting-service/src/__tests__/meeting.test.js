@@ -88,7 +88,11 @@ jest.mock('@pms/kafka', () => ({
 }));
 
 jest.mock('@pms/constants', () => ({
-  TOPICS: { MEETING_EVENTS: 'pms.meeting.events' },
+  TOPICS: {
+    MEETING_EVENTS: 'pms.meeting.events',
+    WORKSPACE_EVENTS: 'pms.workspace.events',
+    PROJECT_EVENTS: 'pms.project.events',
+  },
 }));
 
 jest.mock('supertokens-node', () => ({
@@ -122,6 +126,12 @@ jest.mock('../config/prisma', () => ({
     updateMany: jest.fn(),
     upsert: jest.fn(),
     deleteMany: jest.fn(),
+  },
+  workspaceMemberCache: {
+    findUnique: jest.fn(),
+  },
+  projectWorkspaceCache: {
+    findUnique: jest.fn(),
   },
 }));
 
@@ -184,6 +194,10 @@ describe('Meeting Controller', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'error').mockImplementation(() => {});
+    // Default: creator is a workspace member (create-authz passes).
+    prisma.workspaceMemberCache.findUnique.mockResolvedValue({ workspaceId: WORKSPACE_ID, userId: USER_ID, role: 'member' });
+    // Default: no cached project row (cold cache => project guard is a no-op).
+    prisma.projectWorkspaceCache.findUnique.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -214,6 +228,46 @@ describe('Meeting Controller', () => {
       expect(res.body.status).toBe('success');
       expect(res.body.data.id).toBe(MEETING_ID);
       expect(prisma.meeting.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects with 404 when projectId belongs to a different workspace', async () => {
+      prisma.projectWorkspaceCache.findUnique.mockResolvedValue({
+        projectId: 'eeeeeeee-0000-4000-a000-eeeeeeeeeeee',
+        workspaceId: 'ffffffff-0000-4000-a000-ffffffffffff', // different workspace
+      });
+
+      await request(App)
+        .post(BASE)
+        .send({
+          workspaceId: WORKSPACE_ID,
+          projectId: 'eeeeeeee-0000-4000-a000-eeeeeeeeeeee',
+          title: 'Team Sync',
+          startTime: FUTURE_START,
+          endTime: FUTURE_END,
+          meetingLink: 'https://meet.example.com/abc',
+          participantIds: [OTHER_USER],
+        })
+        .expect(404);
+
+      expect(prisma.meeting.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 403 when the creator is not a workspace member', async () => {
+      prisma.workspaceMemberCache.findUnique.mockResolvedValue(null);
+
+      await request(App)
+        .post(BASE)
+        .send({
+          workspaceId: WORKSPACE_ID,
+          title: 'Team Sync',
+          startTime: FUTURE_START,
+          endTime: FUTURE_END,
+          meetingLink: 'https://meet.example.com/abc',
+          participantIds: [OTHER_USER],
+        })
+        .expect(403);
+
+      expect(prisma.meeting.create).not.toHaveBeenCalled();
     });
 
     it('rejects with 422 when endTime is before startTime', async () => {
@@ -515,7 +569,7 @@ describe('Meeting Controller', () => {
     it('rejects with 422 for an invalid RSVP value', async () => {
       const res = await request(App)
         .patch(`${BASE}/${MEETING_ID}/rsvp`)
-        .send({ rsvp: 'tentative' })
+        .send({ rsvp: 'maybe' })
         .expect(422);
     });
 
@@ -630,6 +684,10 @@ describe('ReminderService.CheckReminders', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // jest.config has resetMocks:true, which wipes mock implementations before
+    // each test. Re-apply the nodemailer mock impls the reminder flow depends on.
+    nodemailer.createTransport.mockReturnValue({ sendMail: mockSendMail });
+    mockSendMail.mockResolvedValue({ messageId: 'test-id' });
     jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 

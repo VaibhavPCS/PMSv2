@@ -2,6 +2,7 @@ const { HandleUncaughtException, HandleUnhandledRejection } = require('@pms/erro
 const { CreateLogger }             = require('@pms/logger');
 const { StartConsumer }            = require('./events/consumers');
 const { StartRecurringScheduler }  = require('./engine/recurring-scheduler');
+const { StartOverdueScanner }      = require('./engine/overdue-scanner');
 
 HandleUncaughtException();
 
@@ -13,6 +14,7 @@ const Server = App.listen(PORT, () => {
   Logger.info(`task-service running on port ${PORT}`);
   StartConsumer();
   StartRecurringScheduler();
+  StartOverdueScanner();
 });
 
 HandleUnhandledRejection(Server);

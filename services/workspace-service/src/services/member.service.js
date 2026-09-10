@@ -83,6 +83,14 @@ const ChangeMemberRole = async (workspaceId, targetUserId, newRole, requesterId)
     if (newRole === ROLES.OWNER) {
       throw new APIError(400, 'Cannot assign owner role directly. Use transfer ownership.');
     }
+    // Only an owner may mint new admins.
+    if (newRole === ROLES.ADMIN && requester.role !== ROLES.OWNER) {
+      throw new APIError(403, 'Only owners can promote members to admin.');
+    }
+    // A non-owner cannot change their own role.
+    if (targetUserId === requesterId && requester.role !== ROLES.OWNER) {
+      throw new APIError(400, 'You cannot change your own role.');
+    }
 
     return tx.workspaceMember.update({
       where: { workspaceId_userId: { workspaceId, userId: targetUserId } },

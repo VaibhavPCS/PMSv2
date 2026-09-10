@@ -1,6 +1,16 @@
+const sanitizeHtml = require('sanitize-html');
 const prisma = require('../config/prisma');
 const { APIError } = require('@pms/error-handler');
+const { DAY_MS } = require('@pms/constants');
 const { Encrypt, Decrypt } = require('./encryption.service');
+const AuthClient = require('../clients/auth.client');
+
+const SANITIZE_OPTIONS = {
+    allowedTags: ['b', 'i', 'em', 'strong', 'u', 'p', 'br', 'a', 'ul', 'ol', 'li'],
+    allowedAttributes: { a: ['href', 'target', 'rel'] },
+};
+
+const _sanitize = (plaintext) => sanitizeHtml(plaintext, SANITIZE_OPTIONS);
 
 const _getMessageForParticipant = async (messageId, userId) => {
     const message = await prisma.message.findUnique({ where: { id: messageId } });
@@ -23,12 +33,20 @@ const SendMessage = async (chatId, senderId, plaintext, parentMessageId = null) 
         if (!parent) throw new APIError(400, 'Invalid parent message for this chat');
     }
 
-    const { content, iv, authTag } = Encrypt(plaintext);
+    const sanitized = _sanitize(plaintext);
+    const { content, iv, authTag } = Encrypt(sanitized);
     const message = await prisma.message.create({
         data: { chatId, senderId, content, iv, authTag, parentMessageId },
     });
 
-    return { ...message, content: plaintext };
+    // Hydrate `sender` so the HTTP response AND the 'new-message' socket
+    // broadcast carry { _id, name, profilePicture } — the chat window renders
+    // message.sender.* and crashes without it. Soft-fails to senderId-only.
+    const orgUsers = await AuthClient.ListOrganizationUsers();
+    const sender = orgUsers.find((u) => u._id === senderId)
+        || { _id: senderId, name: 'Unknown', email: '', profilePicture: null };
+
+    return { ...message, sender, content: sanitized };
 };
 
 const GetMessages = async (chatId, userId, page = 1, limit = 20) => {
@@ -53,12 +71,21 @@ const GetMessages = async (chatId, userId, page = 1, limit = 20) => {
         include: { reactions: true, reads: true },
     });
 
+    // comms owns no user data; hydrate each message's `sender` ({ _id, name,
+    // profilePicture }) from auth-service so the frontend can render avatars and
+    // group consecutive messages by sender. Soft-fails to senderId-only.
+    const orgUsers = await AuthClient.ListOrganizationUsers();
+    const usersById = new Map(orgUsers.map((u) => [u._id, u]));
+    const _sender = (senderId) =>
+        usersById.get(senderId) || { _id: senderId, name: 'Unknown', email: '', profilePicture: null };
+
     return messages.map((msg) => {
+        const sender = _sender(msg.senderId);
         if (msg.isDeleted) {
-            return { ...msg, content: 'This message was deleted' };
+            return { ...msg, sender, content: 'This message was deleted' };
         }
         const decryptedContent = Decrypt({ content: msg.content, iv: msg.iv, authTag: msg.authTag });
-        return { ...msg, content: decryptedContent };
+        return { ...msg, sender, content: decryptedContent };
     });
 };
 
@@ -67,14 +94,18 @@ const EditMessage = async (messageId, userId, newPlaintext) => {
     if (!message) throw new APIError(404, 'Message not found');
     if (message.isDeleted) throw new APIError(410, 'Message was deleted');
     if (message.senderId !== userId) throw new APIError(403, 'You can only edit your own messages');
+    if (Date.now() - new Date(message.createdAt).getTime() > DAY_MS) {
+        throw new APIError(403, 'Cannot edit messages older than 24 hours');
+    }
 
-    const { content, iv, authTag } = Encrypt(newPlaintext);
+    const sanitized = _sanitize(newPlaintext);
+    const { content, iv, authTag } = Encrypt(sanitized);
     const updatedMessage = await prisma.message.update({
         where: { id: messageId },
         data: { content, iv, authTag, isEdited: true },
     });
 
-    return { ...updatedMessage, content: newPlaintext };
+    return { ...updatedMessage, content: sanitized };
 };
 
 const DeleteMessage = async (messageId, userId) => {
@@ -118,20 +149,43 @@ const MarkAsRead = async (messageId, userId) => {
     });
 };
 
+// Marks every unread message in a chat as read for the user (bulk). Called when
+// the user opens a chat — without this the sidebar unread badge never clears,
+// since the count is recomputed server-side on each refresh. Returns how many
+// rows were newly marked.
+const MarkChatAsRead = async (chatId, userId) => {
+    const participant = await prisma.chatParticipant.findFirst({ where: { chatId, userId, isActive: true } });
+    if (!participant) throw new APIError(403, 'You are not a participant in this chat');
+
+    const unread = await prisma.message.findMany({
+        where: { chatId, isDeleted: false, senderId: { not: userId }, reads: { none: { userId } } },
+        select: { id: true },
+    });
+    if (unread.length === 0) return { marked: 0 };
+
+    await prisma.messageRead.createMany({
+        data: unread.map((m) => ({ messageId: m.id, userId })),
+        skipDuplicates: true,
+    });
+    return { marked: unread.length };
+};
+
+// Total unread messages for the user across all chats they actively
+// participate in. The previous implementation used a $queryRaw that
+// referenced PascalCase table names ("Message"/"ChatParticipant"/
+// "MessageRead"); the physical tables are snake_case (@@map) so that query
+// threw at runtime. Use the typed Prisma API which honours @@map and also
+// excludes the user's own messages.
 const GetUnreadCount = async (userId) => {
-    const result = await prisma.$queryRaw`
-    SELECT COUNT(*)::int AS count
-    FROM "Message" m
-    JOIN "ChatParticipant" cp ON m."chatId" = cp."chatId"
-    WHERE cp."userId" = ${userId}
-      AND cp."isActive" = true
-      AND m."isDeleted" = false
-      AND NOT EXISTS (
-        SELECT 1 FROM "MessageRead" mr
-        WHERE mr."messageId" = m.id AND mr."userId" = ${userId}
-      )
-  `;
-    return Number(result[0].count);
+    const count = await prisma.message.count({
+        where: {
+            isDeleted: false,
+            senderId: { not: userId },
+            chat: { participants: { some: { userId, isActive: true } } },
+            reads: { none: { userId } },
+        },
+    });
+    return count;
 };
 
 module.exports = {
@@ -142,5 +196,6 @@ module.exports = {
     AddReaction,
     RemoveReaction,
     MarkAsRead,
+    MarkChatAsRead,
     GetUnreadCount,
 };

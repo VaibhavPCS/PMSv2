@@ -1,10 +1,5 @@
-import type {
-  ApiResponse,
-  PaginatedResponse,
-  Task,
-  Comment,
-  Attachment,
-} from '@shared/types';
+// Task endpoint module. Endpoints ported VERBATIM from OLD app (singular /task).
+
 import {
   getRequest,
   postRequest,
@@ -13,81 +8,94 @@ import {
   deleteRequest,
   postMultipart,
 } from './client';
-
-const BASE = '/tasks';
+import type { Task, TaskListResponse, MembersResponse } from '@/types';
 
 export interface CreateTaskPayload {
   title: string;
   description?: string;
-  projectId: string;
+  project?: string;
+  projectId?: string;
+  assignedTo?: string;
   assigneeId?: string;
-  status?: Task['status'];
-  priority?: Task['priority'];
+  status?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  startDate?: string;
   dueDate?: string;
   estimatedHours?: number;
   tags?: string[];
+  sprint?: string;
+  [key: string]: unknown;
 }
 
 export interface UpdateTaskPayload {
   title?: string;
   description?: string;
-  assigneeId?: string;
-  status?: Task['status'];
-  priority?: Task['priority'];
+  assignedTo?: string | null;
+  assigneeId?: string | null;
+  status?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  startDate?: string;
   dueDate?: string;
   estimatedHours?: number;
   loggedHours?: number;
   tags?: string[];
-}
-
-export interface TaskFilters {
-  projectId?: string;
-  assigneeId?: string;
-  status?: Task['status'];
-  priority?: Task['priority'];
-  page?: number;
-  limit?: number;
+  [key: string]: unknown;
 }
 
 export const tasksApi = {
-  getAll: (filters: TaskFilters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([k, v]) => {
-      if (v !== undefined) params.set(k, String(v));
-    });
-    return getRequest<PaginatedResponse<Task>>(`${BASE}?${params.toString()}`);
-  },
+  // GET /task/project/:projectId
+  getByProject: (projectId: string) =>
+    getRequest<TaskListResponse>(`/task/project/${projectId}`),
 
-  getById: (id: string) =>
-    getRequest<ApiResponse<Task>>(`${BASE}/${id}`),
+  // GET /task/project/:projectId/user
+  getByProjectForUser: (projectId: string) =>
+    getRequest<TaskListResponse>(`/task/project/${projectId}/user`),
 
+  // GET /task/project/:projectId/members
+  getProjectMembers: (projectId: string) =>
+    getRequest<MembersResponse>(`/task/project/${projectId}/members`),
+
+  // POST /task   (JSON)
   create: (payload: CreateTaskPayload) =>
-    postRequest<ApiResponse<Task>>(BASE, payload),
+    postRequest<{ success?: boolean; data?: Task }>('/task', payload),
 
-  update: (id: string, payload: UpdateTaskPayload) =>
-    putRequest<ApiResponse<Task>>(`${BASE}/${id}`, payload),
+  // POST /task   (multipart — task with attachments)
+  createMultipart: (formData: FormData) =>
+    postMultipart<{ success?: boolean; data?: Task }>('/task', formData),
 
-  updateStatus: (id: string, status: Task['status']) =>
-    patchRequest<ApiResponse<Task>>(`${BASE}/${id}/status`, { status }),
+  // PUT /task/:id
+  update: (taskId: string, payload: UpdateTaskPayload) =>
+    putRequest<{ success?: boolean; data?: Task }>(`/task/${taskId}`, payload),
 
-  delete: (id: string) =>
-    deleteRequest<ApiResponse<null>>(`${BASE}/${id}`),
+  // PATCH /task/:id   (e.g. { assignedTo })
+  patch: (taskId: string, payload: Partial<UpdateTaskPayload>) =>
+    patchRequest<{ success?: boolean; data?: Task }>(`/task/${taskId}`, payload),
 
-  logHours: (id: string, hours: number) =>
-    patchRequest<ApiResponse<Task>>(`${BASE}/${id}/log-hours`, { hours }),
+  // DELETE /task/:id
+  remove: (taskId: string) =>
+    deleteRequest<{ success?: boolean }>(`/task/${taskId}`),
 
-  getComments: (id: string) =>
-    getRequest<ApiResponse<Comment[]>>(`${BASE}/${id}/comments`),
+  // POST /task/:id/status   with { status }
+  updateStatus: (taskId: string, status: string) =>
+    postRequest<{ success?: boolean; data?: Task }>(`/task/${taskId}/status`, { status }),
 
-  addComment: (id: string, content: string) =>
-    postRequest<ApiResponse<Comment>>(`${BASE}/${id}/comments`, { content }),
+  // POST /task/:id/hold   with { reason }
+  hold: (taskId: string, reason: string) =>
+    postRequest<{ success?: boolean; data?: Task }>(`/task/${taskId}/hold`, { reason }),
 
-  deleteComment: (taskId: string, commentId: string) =>
-    deleteRequest<ApiResponse<null>>(`${BASE}/${taskId}/comments/${commentId}`),
+  // POST /task/:id/resume
+  resume: (taskId: string) =>
+    postRequest<{ success?: boolean; data?: Task }>(`/task/${taskId}/resume`, {}),
 
-  uploadAttachment: (id: string, formData: FormData) =>
-    postMultipart<ApiResponse<Attachment>>(`${BASE}/${id}/attachments`, formData),
+  // POST /task/:id/approve
+  approve: (taskId: string) =>
+    postRequest<{ success?: boolean; data?: Task }>(`/task/${taskId}/approve`, {}),
 
-  deleteAttachment: (taskId: string, attachmentId: string) =>
-    deleteRequest<ApiResponse<null>>(`${BASE}/${taskId}/attachments/${attachmentId}`),
+  // POST /task/:id/reject   (JSON body)
+  reject: (taskId: string, payload: Record<string, unknown>) =>
+    postRequest<{ success?: boolean; data?: Task }>(`/task/${taskId}/reject`, payload),
+
+  // POST /task/:id/reject   (multipart — rejection with attachments)
+  rejectMultipart: (taskId: string, formData: FormData) =>
+    postMultipart<{ success?: boolean; data?: Task }>(`/task/${taskId}/reject`, formData),
 };

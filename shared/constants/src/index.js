@@ -63,6 +63,7 @@ const TOPICS = {
     TASK_EVENTS: 'pms.task.events',
     SPRINT_EVENTS: 'pms.sprint.events',
     COMMS_EVENTS: 'pms.comms.events',
+    COMMENT_EVENTS: 'pms.comment.events',
     NOTIFICATION_EVENTS: 'pms.notification.events',
     FILE_EVENTS: 'pms.file.events',
     MEETING_EVENTS:   'pms.meeting.events',
@@ -106,6 +107,8 @@ const NOTIFICATION_TYPES = {
   WORKFLOW_STAGE_CHANGED:  'WORKFLOW_STAGE_CHANGED',
   WORKFLOW_SLA_BREACHED:   'WORKFLOW_SLA_BREACHED',
   WORKFLOW_ESCALATED:      'WORKFLOW_ESCALATED',
+  COMMENT_ADDED:           'COMMENT_ADDED',
+  COMMENT_MENTION:         'COMMENT_MENTION',
 };
 
 module.exports = {

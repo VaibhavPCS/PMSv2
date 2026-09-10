@@ -1,0 +1,273 @@
+'use client';
+
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ChevronDown, Calendar, FileSpreadsheet } from 'lucide-react';
+import { useBadges } from '@/providers/BadgeProvider';
+import { useAuthContext } from '@/providers/AuthProvider';
+
+// Navigation item type
+interface NavItem {
+  name: string;
+  href: string;
+  icon: string; // SVG path
+  iconComponent?: React.ElementType; // Optional component for icon
+  badgeKey?: 'notifications' | 'messages'; // Key to identify which badge to show
+  hasDropdown?: boolean; // For Administration item
+  subItems?: { name: string; href: string }[]; // Submenu items for dropdown
+}
+
+// Define the navigation items matching Figma design
+const navItems: NavItem[] = [
+  {
+    name: 'Dashboard',
+    href: '/dashboard',
+    icon: '/assets/4001ba5860d2858f2469e275a4ce7fe2c2c2a952.svg',
+  },
+  {
+    name: 'Workspace',
+    href: '/workspace',
+    icon: '/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg',
+  },
+  {
+    name: 'Excel Upload',
+    href: '/excel-upload',
+    icon: '',
+    iconComponent: FileSpreadsheet,
+  },
+  {
+    name: 'Analytics',
+    href: '/analytics',
+    icon: '/assets/analytics-icon-1.svg', // ✅ Icon path
+  },
+  {
+    name: 'Chat',
+    href: '/chat',
+    icon: '/assets/chat.svg', // ✅ Icon path
+    badgeKey: 'messages',
+  },
+  {
+    name: 'Calendar',
+    href: '/meetings',
+    icon: '',
+    iconComponent: Calendar,
+  },
+  {
+    name: 'Administration',
+    href: '/administration',
+    icon: '/assets/b7b1ff15d3dbedec030add1434e807ef753068e4.svg',
+    hasDropdown: true,
+    subItems: [
+      // { name: "Role Management", href: "/administration/role-management" },
+      // { name: "User Management", href: "/administration/user-management" },
+      { name: 'Analytics', href: '/administration/project-management' },
+    ],
+  },
+];
+
+const VerticalSidebar = () => {
+  const pathname = usePathname();
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const { badgeCounts } = useBadges();
+  const { user } = useAuthContext();
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  const effectiveNavItems = navItems.map((item) => {
+    if (item.name === 'Workspace') {
+      return { ...item, name: 'Workspace' };
+    }
+    return item;
+  });
+
+  const visibleNavItems = effectiveNavItems.filter((item) => {
+    if (item.name === 'Administration') return isAdmin;
+    if (item.name === 'Analytics') return !isAdmin;
+    return true;
+  });
+
+  const isActive = (
+    href: string,
+    hasDropdown?: boolean,
+    subItems?: { name: string; href: string }[]
+  ) => {
+    if (hasDropdown && subItems) {
+      const isOnSubRoute = subItems.some(
+        (subItem) => pathname === subItem.href
+      );
+      if (isOnSubRoute) {
+        return false;
+      }
+      return pathname === href;
+    }
+
+    return pathname === href || pathname.startsWith(href + '/');
+  };
+
+  const toggleDropdown = (itemName: string) => {
+    setExpandedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemName)) {
+        newSet.delete(itemName);
+      } else {
+        newSet.add(itemName);
+      }
+      return newSet;
+    });
+  };
+
+  return (
+    <div
+      className="flex flex-col bg-white h-screen border-r border-gray-200"
+      style={{ width: '224px' }}
+    >
+      {/* Logo Section */}
+      <div className="flex items-center px-[16px] py-[20px] border-b border-gray-200">
+        <div className="flex items-center gap-[12px]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/pcs_logo.jpg"
+            alt="PCS Logo"
+            className="w-[40px] h-[40px] rounded-[8px] object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <div className="flex flex-col">
+            <span
+              className="font-['Inter',sans-serif] text-[12px] font-medium leading-normal"
+              style={{
+                color: '#0A0A0A',
+                fontWeight: 500,
+                whiteSpace: 'pre-line',
+              }}
+            >
+              PCS Managament{'\n'}System Tracker
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* MENU Label */}
+      <div className="px-[16px] pt-[20px] pb-[12px]">
+        <span className="font-['Inter:Regular',sans-serif] text-[12px] tracking-[0.5px] text-[#717182] uppercase">
+          Menu
+        </span>
+      </div>
+
+      {/* Navigation Items */}
+      <nav className="px-[12px] space-y-[4px] pb-[20px]">
+        {visibleNavItems.map((item) => {
+          const active = isActive(item.href, item.hasDropdown, item.subItems);
+          const isExpanded = expandedItems.has(item.name);
+
+          return (
+            <div key={item.name}>
+              {item.hasDropdown ? (
+                <>
+                  <button
+                    onClick={() => toggleDropdown(item.name)}
+                    className={`
+                      w-[200px] flex items-center justify-between
+                      rounded-[5px] pl-[12px] pr-0 py-[10px]
+                      transition-colors
+                      ${active
+                        ? 'bg-[#f2761b] text-white'
+                        : isExpanded
+                          ? 'bg-[#e6e8ec] text-[#717182]'
+                          : 'text-[#717182] hover:bg-[#e6e8ec]'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center gap-[12px]">
+                      {item.iconComponent ? (
+                        <item.iconComponent className="w-[20px] h-[20px]" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.icon}
+                          alt={item.name}
+                          className="w-[20px] h-[20px]"
+                        />
+                      )}
+                      <span className="font-['Inter:Medium',sans-serif] text-[14px] tracking-[0.5px] leading-[normal]">
+                        {item.name}
+                      </span>
+                    </div>
+                    <ChevronDown
+                      className={`w-[24px] h-[24px] transition-transform ${isExpanded ? 'rotate-180' : ''
+                        }`}
+                    />
+                  </button>
+
+                  {isExpanded && item.subItems && (
+                    <div className="mt-[4px] space-y-[4px]">
+                      {item.subItems.map((subItem) => {
+                        const subActive = isActive(subItem.href, false);
+                        return (
+                          <Link
+                            key={subItem.href}
+                            href={subItem.href}
+                            className={`
+                              w-[200px] flex items-center
+                              rounded-[5px] pl-[44px] pr-[12px] py-[10px]
+                              transition-colors
+                              ${subActive
+                                ? 'bg-[#f2761b] text-white'
+                                : 'text-[#717182] hover:bg-[#e6e8ec]'
+                              }
+                            `}
+                          >
+                            <span className="font-['Inter:Regular',sans-serif] text-[14px] tracking-[0.5px] leading-[normal]">
+                              {subItem.name}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link
+                  href={item.href}
+                  className={`
+                    w-[200px] flex items-center gap-[12px]
+                    rounded-[5px] pl-[12px] pr-0 py-[12px]
+                    transition-colors
+                    ${active
+                      ? 'bg-[#f2761b] text-white'
+                      : 'text-[#717182] hover:bg-[#e6e8ec]'
+                    }
+                  `}
+                >
+                  {item.iconComponent ? (
+                    <item.iconComponent className="w-[20px] h-[20px] shrink-0" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.icon}
+                      alt={item.name}
+                      className="w-[20px] h-[20px] shrink-0"
+                    />
+                  )}
+                  <span className="font-['Inter:Medium',sans-serif] text-[14px] tracking-[0.5px] leading-[normal] grow">
+                    {item.name}
+                  </span>
+                  {item.badgeKey && badgeCounts[item.badgeKey] > 0 && (
+                    <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center ${active ? 'bg-white text-[#F2761B]' : 'bg-[#F2761B] text-white'
+                      }`}>
+                      {badgeCounts[item.badgeKey] > 9 ? '9+' : badgeCounts[item.badgeKey]}
+                    </div>
+                  )}
+                </Link>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+    </div>
+  );
+};
+
+export default VerticalSidebar;

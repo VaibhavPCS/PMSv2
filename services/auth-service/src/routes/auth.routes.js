@@ -2,18 +2,117 @@ const Router   = require('express').Router();
 const { z }    = require('zod');
 
 const { AuthenticateToken, RequireRole } = require('@pms/auth-middleware');
-const { ValidateRequest }                = require('@pms/validators');
+const { ValidateRequest, PasswordSchema } = require('@pms/validators');
 const { GetMe, UpdateProfile,
-        UpdateUserRole }                 = require('../controllers/auth.controller');
+        UpdateUserRole,
+        ForgotPassword, VerifyResetOtp,
+        ResetPassword }                  = require('../controllers/auth.controller');
 
 const UpdateProfileSchema = z.object({
-  name:           z.string().min(2, 'Name must be at least 2 characters').optional(),
+  name:           z.string().trim().min(3, 'Name must be at least 3 characters').optional(),
   profilePicture: z.url().optional(),
 }).strict();
 
 const UpdateRoleSchema = z.object({
   role: z.enum(['super_admin', 'admin', 'project_head', 'team_lead', 'member']),
 }).strict();
+
+const ForgotPasswordSchema = z.object({
+  email: z.email('A valid email is required'),
+}).strict();
+
+const VerifyResetOtpSchema = z.object({
+  userId: z.string().trim().min(1, 'userId is required'),
+  otp:    z.string().trim().min(4, 'A valid OTP is required'),
+}).strict();
+
+const ResetPasswordSchema = z.object({
+  userId:      z.string().trim().min(1, 'userId is required'),
+  resetToken:  z.string().trim().min(1, 'resetToken is required'),
+  newPassword: PasswordSchema,
+}).strict();
+
+// Password-reset flow — PUBLIC (the user is signed out here) and STATIC, so
+// these are registered before the param route (/users/:userId/role) to ensure
+// their fixed segments are never captured as an :id.
+
+/**
+ * @openapi
+ * /api/v1/auth/forgot-password:
+ *   post:
+ *     tags: [Password Reset]
+ *     summary: Start a password reset (emails an OTP)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200:
+ *         description: Reset OTP sent — returns the userId for the next step
+ *       404:
+ *         description: No account for that email
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+Router.post('/forgot-password', ValidateRequest(ForgotPasswordSchema), ForgotPassword);
+
+/**
+ * @openapi
+ * /api/v1/auth/verify-reset-otp:
+ *   post:
+ *     tags: [Password Reset]
+ *     summary: Verify the emailed reset OTP and obtain a reset token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, otp]
+ *             properties:
+ *               userId: { type: string }
+ *               otp:    { type: string }
+ *     responses:
+ *       200:
+ *         description: OTP verified — returns { verified, resetToken }
+ *       400:
+ *         description: Invalid or expired OTP
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+Router.post('/verify-reset-otp', ValidateRequest(VerifyResetOtpSchema), VerifyResetOtp);
+
+/**
+ * @openapi
+ * /api/v1/auth/reset-password:
+ *   post:
+ *     tags: [Password Reset]
+ *     summary: Set a new password using the reset token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [userId, resetToken, newPassword]
+ *             properties:
+ *               userId:      { type: string }
+ *               resetToken:  { type: string }
+ *               newPassword: { type: string, format: password }
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired reset token
+ *       422:
+ *         $ref: '#/components/responses/ValidationError'
+ */
+Router.post('/reset-password', ValidateRequest(ResetPasswordSchema), ResetPassword);
 
 /**
  * @openapi

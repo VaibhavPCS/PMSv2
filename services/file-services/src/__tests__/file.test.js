@@ -10,14 +10,6 @@ process.env.SUPERTOKENS_API_KEY = 'test-key';
 process.env.API_DOMAIN = 'http://localhost:4000';
 process.env.WEBSITE_DOMAIN = 'http://localhost:3000';
 
-// MinIO env vars (required by config/minio.js at module scope)
-process.env.MINIO_ENDPOINT  = 'localhost';
-process.env.MINIO_PORT      = '9000';
-process.env.MINIO_USE_SSL   = 'false';
-process.env.MINIO_ACCESS_KEY = 'minioadmin';
-process.env.MINIO_SECRET_KEY = 'minioadmin';
-process.env.MINIO_BUCKET    = 'test-bucket';
-
 jest.mock('@pms/auth-middleware', () => ({
   InitAuth: jest.fn(),
   AuthenticateToken: (req, _res, next) => {
@@ -60,16 +52,12 @@ jest.mock('supertokens-node/framework/express', () => ({
 jest.mock('supertokens-node/recipe/session', () => ({ init: jest.fn() }));
 jest.mock('supertokens-node/recipe/emailpassword', () => ({ init: jest.fn() }));
 
-// Mock the minio config module — avoids the real MinIO client being instantiated
-jest.mock('../config/minio', () => ({
-  client: {
-    putObject: jest.fn(),
-    presignedGetObject: jest.fn(),
-    removeObject: jest.fn(),
-    bucketExists: jest.fn().mockResolvedValue(true),
-  },
-  BUCKET: 'test-bucket',
-  EnsureBucket: jest.fn().mockResolvedValue(undefined),
+// Mock the storage abstraction so neither SeaweedFS nor the AWS SDK is touched.
+// file.service.js calls StorageService.Upload / GetPresignedUrl / Delete.
+jest.mock('../services/storage.service', () => ({
+  Upload: jest.fn(),
+  GetPresignedUrl: jest.fn(),
+  Delete: jest.fn(),
 }));
 
 jest.mock('../config/prisma', () => ({
@@ -79,6 +67,9 @@ jest.mock('../config/prisma', () => ({
     findMany: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+  },
+  workspaceMemberCache: {
+    findUnique: jest.fn(),
   },
 }));
 
@@ -106,7 +97,7 @@ jest.mock('file-type', () => ({
 
 const request = require('supertest');
 const { fileTypeFromBuffer } = require('file-type');
-const { client: minioClient } = require('../config/minio');
+const Storage = require('../services/storage.service');
 const prisma = require('../config/prisma');
 const App = require('../app');
 
@@ -119,6 +110,7 @@ const USER_ID     = 'user-test-id';
 const WORKSPACE_ID = 'aaaaaaaa-0000-4000-a000-aaaaaaaaaaaa';
 const ENTITY_ID    = 'bbbbbbbb-0000-4000-a000-bbbbbbbbbbbb';
 const FILE_ID      = 'cccccccc-0000-4000-a000-cccccccccccc';
+const PRESIGNED    = 'http://localhost:8333/pms-files/presigned-url';
 
 const makeFileRecord = (overrides = {}) => ({
   id: FILE_ID,
@@ -135,13 +127,6 @@ const makeFileRecord = (overrides = {}) => ({
   ...overrides,
 });
 
-// Serialised version (BigInt → string) as returned by the service layer
-const makeFileResponse = (overrides = {}) => ({
-  ...makeFileRecord(overrides),
-  sizeBytes: '1024',
-  url: 'https://minio.example.com/presigned-url',
-});
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -149,20 +134,16 @@ const makeFileResponse = (overrides = {}) => ({
 describe('File Controller', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Default: file type detection returns an allowed MIME type
     fileTypeFromBuffer.mockResolvedValue({ mime: 'image/jpeg' });
+    Storage.Upload.mockResolvedValue(`${WORKSPACE_ID}/${ENTITY_ID}/some-uuid.jpg`);
+    Storage.GetPresignedUrl.mockResolvedValue(PRESIGNED);
+    Storage.Delete.mockResolvedValue(undefined);
+    // Default: uploader is a workspace member (upload-authz passes).
+    prisma.workspaceMemberCache.findUnique.mockResolvedValue({ workspaceId: WORKSPACE_ID, userId: USER_ID, role: 'member' });
   });
-
-  // -------------------------------------------------------------------------
-  // POST /api/v1/files — Upload file
-  // -------------------------------------------------------------------------
 
   describe('POST /api/v1/files (upload)', () => {
     it('uploads a file, stores metadata, and returns 201 with a presigned URL', async () => {
-      minioClient.putObject.mockResolvedValue(undefined);
-      minioClient.presignedGetObject.mockResolvedValue(
-        'https://minio.example.com/presigned-url'
-      );
       prisma.file.create.mockResolvedValue(makeFileRecord());
 
       const res = await request(App)
@@ -178,9 +159,9 @@ describe('File Controller', () => {
 
       expect(res.body.status).toBe('success');
       expect(res.body.data.filename).toBe('test.jpg');
-      expect(res.body.data.url).toBeDefined();
+      expect(res.body.data.url).toBe(PRESIGNED);
 
-      expect(minioClient.putObject).toHaveBeenCalledTimes(1);
+      expect(Storage.Upload).toHaveBeenCalledTimes(1);
       expect(prisma.file.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -192,8 +173,25 @@ describe('File Controller', () => {
       );
     });
 
+    it('responds 403 when the uploader is not a workspace member', async () => {
+      prisma.workspaceMemberCache.findUnique.mockResolvedValue(null);
+
+      await request(App)
+        .post(BASE)
+        .field('workspaceId', WORKSPACE_ID)
+        .field('entityType', 'task')
+        .field('entityId', ENTITY_ID)
+        .attach('file', Buffer.from('fake-image-content'), {
+          filename: 'test.jpg',
+          contentType: 'image/jpeg',
+        })
+        .expect(403);
+
+      expect(prisma.file.create).not.toHaveBeenCalled();
+    });
+
     it('responds 400 when no file is attached', async () => {
-      const res = await request(App)
+      await request(App)
         .post(BASE)
         .field('workspaceId', WORKSPACE_ID)
         .field('entityType', 'task')
@@ -246,10 +244,7 @@ describe('File Controller', () => {
     });
 
     it('rejects disallowed MIME type (file filter rejects at multer level)', async () => {
-      // Multer fileFilter calls cb(new Error('File type not allowed'), false)
-      // for disallowed MIME types. The ErrorHandler.MulterError middleware
-      // handles this as a 400.
-      const res = await request(App)
+      await request(App)
         .post(BASE)
         .field('workspaceId', WORKSPACE_ID)
         .field('entityType', 'task')
@@ -264,7 +259,6 @@ describe('File Controller', () => {
     });
 
     it('rejects a file whose detected MIME differs from declared MIME', async () => {
-      // Simulate detection returning a disallowed type despite allowed declared MIME
       fileTypeFromBuffer.mockResolvedValue({ mime: 'application/x-msdownload' });
 
       const res = await request(App)
@@ -281,15 +275,10 @@ describe('File Controller', () => {
       expect(res.body.message).toMatch(/content type/i);
     });
 
-    it('rolls back the MinIO object when prisma.file.create fails', async () => {
-      minioClient.putObject.mockResolvedValue(undefined);
-      minioClient.presignedGetObject.mockResolvedValue('https://url');
-      minioClient.removeObject.mockResolvedValue(undefined);
-
+    it('rolls back the stored object when prisma.file.create fails', async () => {
       const dbError = new Error('DB error');
       prisma.file.create.mockRejectedValue(dbError);
 
-      // The service catches the error, calls StorageService.Delete, then re-throws
       await request(App)
         .post(BASE)
         .field('workspaceId', WORKSPACE_ID)
@@ -301,13 +290,9 @@ describe('File Controller', () => {
         })
         .expect(500);
 
-      expect(minioClient.removeObject).toHaveBeenCalledTimes(1);
+      expect(Storage.Delete).toHaveBeenCalledTimes(1);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // GET /api/v1/files — List files for entity
-  // -------------------------------------------------------------------------
 
   describe('GET /api/v1/files', () => {
     it('returns files for a given entityType and entityId', async () => {
@@ -326,11 +311,12 @@ describe('File Controller', () => {
           where: expect.objectContaining({
             entityType: 'task',
             entityId: ENTITY_ID,
-            uploadedBy: USER_ID,
             isDeleted: false,
           }),
         })
       );
+      // entity-scoped: NOT filtered by uploader, so teammates see attachments
+      expect(prisma.file.findMany.mock.calls[0][0].where).not.toHaveProperty('uploadedBy');
     });
 
     it('responds 400 when entityType is missing', async () => {
@@ -357,10 +343,7 @@ describe('File Controller', () => {
         .expect(200);
 
       expect(prisma.file.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 5,
-          skip: 10,
-        })
+        expect.objectContaining({ take: 5, skip: 10 })
       );
     });
 
@@ -372,10 +355,7 @@ describe('File Controller', () => {
         .expect(200);
 
       expect(prisma.file.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          take: 20,
-          skip: 0,
-        })
+        expect.objectContaining({ take: 20, skip: 0 })
       );
     });
 
@@ -390,23 +370,16 @@ describe('File Controller', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // GET /api/v1/files/:id/url — Get presigned URL
-  // -------------------------------------------------------------------------
-
   describe('GET /api/v1/files/:id/url', () => {
     it('returns a presigned download URL for the file owner', async () => {
       prisma.file.findFirst.mockResolvedValue(makeFileRecord());
-      minioClient.presignedGetObject.mockResolvedValue(
-        'https://minio.example.com/presigned'
-      );
 
       const res = await request(App)
         .get(`${BASE}/${FILE_ID}/url`)
         .expect(200);
 
       expect(res.body.status).toBe('success');
-      expect(res.body.data.url).toBe('https://minio.example.com/presigned');
+      expect(res.body.data.url).toBe(PRESIGNED);
     });
 
     it('responds 404 when the file does not exist or is deleted', async () => {
@@ -419,28 +392,24 @@ describe('File Controller', () => {
       expect(res.body.status).toBe('fail');
     });
 
-    it('responds 403 when the file was uploaded by a different user', async () => {
+    it('allows a teammate (different uploader) to get a download URL — entity-scoped', async () => {
       prisma.file.findFirst.mockResolvedValue(
         makeFileRecord({ uploadedBy: 'someone-else' })
       );
 
       const res = await request(App)
         .get(`${BASE}/${FILE_ID}/url`)
-        .expect(403);
+        .expect(200);
 
-      expect(minioClient.presignedGetObject).not.toHaveBeenCalled();
+      expect(res.body.data.url).toBe(PRESIGNED);
+      expect(Storage.GetPresignedUrl).toHaveBeenCalledTimes(1);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // DELETE /api/v1/files/:id — Soft-delete file
-  // -------------------------------------------------------------------------
-
   describe('DELETE /api/v1/files/:id', () => {
-    it('soft-deletes a file and removes it from MinIO', async () => {
+    it('soft-deletes a file and removes it from SeaweedFS', async () => {
       prisma.file.findFirst.mockResolvedValue(makeFileRecord());
       prisma.file.update.mockResolvedValue({});
-      minioClient.removeObject.mockResolvedValue(undefined);
 
       const res = await request(App)
         .delete(`${BASE}/${FILE_ID}`)
@@ -450,7 +419,7 @@ describe('File Controller', () => {
       expect(prisma.file.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: { isDeleted: true } })
       );
-      expect(minioClient.removeObject).toHaveBeenCalledTimes(1);
+      expect(Storage.Delete).toHaveBeenCalledTimes(1);
     });
 
     it('responds 404 when the file does not exist', async () => {
@@ -464,28 +433,23 @@ describe('File Controller', () => {
         makeFileRecord({ uploadedBy: 'another-user' })
       );
 
-      const res = await request(App)
+      await request(App)
         .delete(`${BASE}/${FILE_ID}`)
         .expect(403);
 
       expect(prisma.file.update).not.toHaveBeenCalled();
     });
 
-    it('rolls back the soft-delete when MinIO removal fails', async () => {
+    it('rolls back the soft-delete when storage removal fails', async () => {
       prisma.file.findFirst.mockResolvedValue(makeFileRecord());
-      // First update = soft-delete succeeds
       prisma.file.update.mockResolvedValueOnce({});
-      // MinIO removal fails
-      minioClient.removeObject.mockRejectedValue(new Error('MinIO timeout'));
-      // Rollback update (isDeleted: false) succeeds
+      Storage.Delete.mockRejectedValue(new Error('SeaweedFS timeout'));
       prisma.file.update.mockResolvedValueOnce({});
 
-      // Service re-throws the MinIO error after rollback attempt
-      const res = await request(App)
+      await request(App)
         .delete(`${BASE}/${FILE_ID}`)
         .expect(500);
 
-      // Rollback was attempted
       expect(prisma.file.update).toHaveBeenCalledTimes(2);
       expect(prisma.file.update).toHaveBeenLastCalledWith(
         expect.objectContaining({ data: { isDeleted: false } })

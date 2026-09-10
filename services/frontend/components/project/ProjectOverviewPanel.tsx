@@ -1,0 +1,103 @@
+'use client';
+
+import React from "react";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { TruncatedTextModal } from "@/components/ui/truncated-text-modal";
+
+type ProjectStatus = 'Planning' | 'In Progress' | 'On Hold' | 'Completed';
+
+interface ProjectOverviewPanelProps {
+  projectManager: string;
+  projectHead?: string;
+  projectHeads?: string[];
+  description: string;
+  startDate: string;
+  endDate: string;
+  status: ProjectStatus;
+}
+
+export function ProjectOverviewPanel({
+  projectManager,
+  projectHead,
+  projectHeads,
+  description,
+  startDate,
+  endDate,
+  status,
+}: ProjectOverviewPanelProps) {
+  const calculateDuration = () => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, diffDays);
+  };
+
+  const duration = calculateDuration();
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const FieldGroup = ({ label, value, fullWidth = false }: { label: string; value: string | React.ReactNode; fullWidth?: boolean }) => (
+    <div className={fullWidth ? "col-span-3" : ""}>
+      <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+        {label}
+      </div>
+      <div className="text-[14px] font-normal font-['Inter'] text-[#040110]">
+        {value}
+      </div>
+    </div>
+  );
+
+  const projectLeadDisplay = (() => {
+    if (projectHeads && projectHeads.length > 0) {
+      return projectHeads.join(', ') || '—';
+    }
+    return projectHead || '—';
+  })();
+
+  return (
+    <div className="bg-[#E5EFFF] rounded-[10px] p-[20px] w-full">
+      {/* Row 1: Project Lead */}
+      <div className="mb-[12px]">
+        <FieldGroup label="Project Lead" value={projectLeadDisplay} fullWidth />
+      </div>
+
+      {/* Row 2: Description */}
+      <div className="mb-[12px]">
+        <FieldGroup
+          label="Description"
+          value={
+            <TruncatedTextModal
+              text={description}
+              lines={3}
+              ellipsisClassName="text-[#040110] bg-[#E5EFFF]"
+              modalBgClassName="bg-[#E5EFFF]"
+              modalTitle="Description"
+            />
+          }
+          fullWidth
+        />
+      </div>
+
+      {/* Row 3: Dates, Duration, Status */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-[16px] gap-y-[12px]">
+        <FieldGroup label="Project Start Date" value={formatDate(startDate)} />
+        <FieldGroup label="Project End Date" value={formatDate(endDate)} />
+        <FieldGroup label="Duration" value={`${duration} Days`} />
+        <div>
+          <div className="text-[12px] font-normal font-['Inter'] text-[#6B7280] mb-[5px]">
+            Status
+          </div>
+          <StatusBadge status={status} />
+        </div>
+      </div>
+    </div>
+  );
+}

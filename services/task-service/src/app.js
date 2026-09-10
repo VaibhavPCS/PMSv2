@@ -9,6 +9,7 @@ const { ErrorHandler, NotFoundHandler } = require('@pms/error-handler');
 const RecurringRoutes = require('./routes/recurring.routes');
 const TaskRoutes = require('./routes/task.routes');
 const SprintRoutes = require('./routes/sprint.routes');
+const ImportRoutes = require('./routes/excel.routes');
 
 InitAuth({
   connectionURI: process.env.SUPERTOKENS_CONNECTION_URI,
@@ -50,6 +51,7 @@ const ApiLimiter = RateLimit({
 App.use('/api/v1/tasks', ApiLimiter, TaskRoutes);
 App.use('/api/v1/sprints', ApiLimiter, SprintRoutes);
 App.use('/api/v1/recurring', ApiLimiter, RecurringRoutes);
+App.use('/api/v1/imports', ApiLimiter, ImportRoutes);
 App.use(errorHandler());
 App.use(NotFoundHandler);
 App.use(ErrorHandler);

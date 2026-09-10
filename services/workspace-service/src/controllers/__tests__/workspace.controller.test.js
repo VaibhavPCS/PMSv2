@@ -36,12 +36,20 @@ jest.mock('@pms/validators', () => ({
 jest.mock('../../services/workspace.service');
 jest.mock('../../services/member.service');
 jest.mock('../../services/invite.service');
+jest.mock('../../clients/auth.client');
 
 const request          = require('supertest');
 const App              = require('../../app');
 const WorkspaceService = require('../../services/workspace.service');
 const MemberService    = require('../../services/member.service');
 const InviteService    = require('../../services/invite.service');
+const AuthClient       = require('../../clients/auth.client');
+
+// Default: caller email resolves to the logged-in user's address.
+// Individual tests override this to exercise self-invite / wrong-recipient guards.
+beforeEach(() => {
+  AuthClient.GetUserEmail.mockResolvedValue('caller@test.com');
+});
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -220,6 +228,42 @@ describe('POST /api/v1/workspaces/accept-invite', () => {
     expect(res.body.status).toBe('success');
     expect(res.body.message).toBe('Invite accepted.');
   });
+
+  it('passes the resolved caller email through to AcceptInvite', async () => {
+    AuthClient.GetUserEmail.mockResolvedValue('caller@test.com');
+    InviteService.AcceptInvite.mockResolvedValue(undefined);
+
+    await request(App)
+      .post('/api/v1/workspaces/accept-invite')
+      .send({ token: 'valid-token' });
+
+    expect(InviteService.AcceptInvite).toHaveBeenCalledWith('valid-token', 'st-user-123', 'caller@test.com');
+  });
+
+  it('returns 403 when the invite was issued to a different email', async () => {
+    const { APIError } = jest.requireActual('@pms/error-handler');
+    InviteService.AcceptInvite.mockRejectedValue(
+      new APIError(403, 'This invite was issued to a different email address.')
+    );
+
+    const res = await request(App)
+      .post('/api/v1/workspaces/accept-invite')
+      .send({ token: 'valid-token' });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('still succeeds when the email lookup is unavailable (null)', async () => {
+    AuthClient.GetUserEmail.mockResolvedValue(null);
+    InviteService.AcceptInvite.mockResolvedValue(undefined);
+
+    const res = await request(App)
+      .post('/api/v1/workspaces/accept-invite')
+      .send({ token: 'valid-token' });
+
+    expect(res.status).toBe(200);
+    expect(InviteService.AcceptInvite).toHaveBeenCalledWith('valid-token', 'st-user-123', null);
+  });
 });
 
 describe('POST /api/v1/workspaces/:id/invite', () => {
@@ -238,6 +282,45 @@ describe('POST /api/v1/workspaces/:id/invite', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data.email).toBe('bob@test.com');
+  });
+
+  it('passes the resolved requester email through to CreateInvite', async () => {
+    AuthClient.GetUserEmail.mockResolvedValue('caller@test.com');
+    InviteService.CreateInvite.mockResolvedValue({
+      id: 'inv-1', email: 'bob@test.com', role: 'member', expiresAt: new Date().toISOString(),
+    });
+
+    await request(App)
+      .post('/api/v1/workspaces/ws-1/invite')
+      .send({ email: 'bob@test.com', role: 'member' });
+
+    expect(InviteService.CreateInvite).toHaveBeenCalledWith('ws-1', 'bob@test.com', 'member', 'st-user-123', 'caller@test.com');
+  });
+
+  it('returns 400 when the requester invites themselves', async () => {
+    const { APIError } = jest.requireActual('@pms/error-handler');
+    AuthClient.GetUserEmail.mockResolvedValue('caller@test.com');
+    InviteService.CreateInvite.mockRejectedValue(new APIError(400, 'You cannot invite yourself.'));
+
+    const res = await request(App)
+      .post('/api/v1/workspaces/ws-1/invite')
+      .send({ email: 'caller@test.com', role: 'member' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('still creates the invite when the email lookup is unavailable (null)', async () => {
+    AuthClient.GetUserEmail.mockResolvedValue(null);
+    InviteService.CreateInvite.mockResolvedValue({
+      id: 'inv-1', email: 'bob@test.com', role: 'member', expiresAt: new Date().toISOString(),
+    });
+
+    const res = await request(App)
+      .post('/api/v1/workspaces/ws-1/invite')
+      .send({ email: 'bob@test.com', role: 'member' });
+
+    expect(res.status).toBe(201);
+    expect(InviteService.CreateInvite).toHaveBeenCalledWith('ws-1', 'bob@test.com', 'member', 'st-user-123', null);
   });
 });
 

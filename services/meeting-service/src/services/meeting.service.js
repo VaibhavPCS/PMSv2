@@ -3,7 +3,33 @@ const { APIError } = require('@pms/error-handler');
 const { parsePagination } = require('@pms/validators');
 const { PublishMeetingCreated } = require('../events/publishers');
 
+// Local authz: the creator must be a member of the meeting's workspace.
+// Backed by WorkspaceMemberCache, populated from WORKSPACE_EVENTS.
+const _assertWorkspaceMember = async (workspaceId, userId) => {
+  const member = await prisma.workspaceMemberCache.findUnique({
+    where: { workspaceId_userId: { workspaceId, userId } },
+  });
+  if (!member) throw new APIError(403, 'You are not a member of this workspace');
+};
+
+// Verify the supplied projectId belongs to the meeting's workspace.
+// Backed by ProjectWorkspaceCache, populated from PROJECT_EVENTS.
+// Cold-cache safe: reject only on an explicit workspace mismatch. When the
+// cache row is absent (projection not yet caught up) we allow creation rather
+// than block a legitimate request.
+const _assertProjectInWorkspace = async (workspaceId, projectId) => {
+  const cached = await prisma.projectWorkspaceCache.findUnique({
+    where: { projectId },
+  });
+  if (cached && cached.workspaceId !== workspaceId) {
+    throw new APIError(404, "Project not found or doesn't belong to this workspace");
+  }
+};
+
 const CreateMeeting = async (createdBy, { workspaceId, projectId, title, description, startTime, endTime, meetingLink, participantIds }) => {
+  await _assertWorkspaceMember(workspaceId, createdBy);
+  if (projectId) await _assertProjectInWorkspace(workspaceId, projectId);
+
   const safeParticipantIds = Array.isArray(participantIds) ? participantIds : [];
   const meeting = await prisma.meeting.create({
     data: {

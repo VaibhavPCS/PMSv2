@@ -1,6 +1,6 @@
 const prisma = require('../config/prisma');
 const { APIError } = require('@pms/error-handler');
-const { ROLES } = require('@pms/constants');
+const { ROLES, PROJECT_STATE, PROJECT_STATUS } = require('@pms/constants');
 const { parsePagination } = require('@pms/validators');
 const { PublishProjectCreated, PublishProjectUpdated, PublishProjectDeleted, PublishProjectDeadlineExtended } = require('../events/publishers');
 
@@ -65,6 +65,47 @@ const GetProjects = async (workspaceId, userId, { page, limit } = {}) => {
     return { data: projects, total, page: safePage, limit: safeLimit };
 };
 
+const RECENT_SORT_FIELDS = ['startDate', 'endDate', 'createdAt'];
+
+// Maps a raw prisma project row to the shape the dashboard reads. The frontend
+// reads response.projects[] expecting _id (NOT id), title (NOT name) and a
+// human-readable status driven by the project `state` (whose values lowercase
+// to the dashboard buckets: planning / in progress / on hold / completed).
+const _toRecentProject = (p) => ({
+    _id:         p.id,
+    title:       p.name,
+    description: p.description ?? null,
+    status:      p.state ?? null,
+    startDate:   p.startDate,
+    endDate:     p.endDate,
+    createdAt:   p.createdAt,
+    updatedAt:   p.updatedAt,
+});
+
+const GetRecentProjects = async (workspaceId, userId, { page, limit, sortBy } = {}) => {
+    // Honour page/limit server-side; allow up to 1000 (dashboard sends limit=1000)
+    // which the regular parsePagination helper would clamp to 100.
+    const safePage  = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(1000, Math.max(1, Number(limit) || 20));
+    const orderField = RECENT_SORT_FIELDS.includes(sortBy) ? sortBy : 'startDate';
+
+    const projects = await prisma.project.findMany({
+        where: {
+            workspaceId,
+            isActive: true,
+            members: { some: { userId, isActive: true } },
+        },
+        include: {
+            members: { where: { userId }, select: { role: true } },
+        },
+        orderBy: { [orderField]: 'desc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+    });
+
+    return projects.map(_toRecentProject);
+};
+
 const GetProjectById = async (projectId, userId) => {
     const project = await prisma.project.findUnique({
         where: { id: projectId },
@@ -95,6 +136,17 @@ const UpdateProject = async (projectId, userId, { name, description, state, proj
     if (projectStatus !== undefined) data.projectStatus = projectStatus;
     if (endDate !== undefined) data.endDate = endDate;
     if (tags !== undefined) data.tags = tags;
+
+    const completingState = state !== undefined && state === PROJECT_STATE.COMPLETED;
+    const completingStatus = projectStatus !== undefined && projectStatus === PROJECT_STATUS.COMPLETED;
+    if (completingState || completingStatus) {
+        const work = await prisma.projectOpenWorkCache.findUnique({ where: { projectId } });
+        const openTasks = work?.openTasks ?? 0;
+        const activeSprints = work?.activeSprints ?? 0;
+        if (openTasks > 0 || activeSprints > 0) {
+            throw new APIError(400, `Cannot complete project: ${openTasks} open task(s) and ${activeSprints} active sprint(s) remaining`);
+        }
+    }
 
     const updated = await prisma.project.update({ where: { id: projectId }, data });
     await PublishProjectUpdated(projectId, userId);
@@ -147,6 +199,7 @@ const ExtendProjectDeadline = async (projectId, userId, { newEndDate, reason }) 
 module.exports = {
     CreateProject,
     GetProjects,
+    GetRecentProjects,
     GetProjectById,
     UpdateProject,
     DeleteProject,

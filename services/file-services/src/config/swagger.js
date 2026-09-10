@@ -6,7 +6,7 @@ const definition = {
   info: {
     title: 'PMS — File Service',
     version: '1.0.0',
-    description: 'File upload and retrieval via MinIO object storage. Owns `pms_files` database.\n\nFiles are stored in MinIO. The API returns pre-signed URLs for direct download. Max file size: 50 MB. Allowed types: images, PDF, DOCX, XLSX, XLS, TXT, CSV.',
+    description: 'File upload and retrieval via SeaweedFS (S3-compatible) object storage. Owns `pms_files` database.\n\nFiles are stored in SeaweedFS through its S3 gateway. The API returns pre-signed URLs for direct download. Max file size: 50 MB. Allowed types: images, PDF, DOCX, XLSX, XLS, TXT, CSV.',
   },
   servers: [{ url: 'http://localhost:4008', description: 'Local development' }],
   tags: [{ name: 'Files', description: 'Upload, list, download, and delete files' }],

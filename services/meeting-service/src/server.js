@@ -1,6 +1,7 @@
 const { HandleUncaughtException, HandleUnhandledRejection } = require('@pms/error-handler');
 const { CreateLogger } = require('@pms/logger');
 const { StartReminderChecker } = require('./services/reminder.service');
+const { StartConsumer } = require('./events/consumers');
 
 HandleUncaughtException();
 
@@ -12,6 +13,8 @@ let checkerStarted = false;
 
 const Server = App.listen(PORT, () => {
   Logger.info(`meeting-service running on port ${PORT}`);
+
+  StartConsumer();
 
   if (!checkerStarted) {
     StartReminderChecker()

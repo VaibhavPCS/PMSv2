@@ -42,3 +42,24 @@ model MeetingParticipant {
   @@unique([meetingId, userId])
   @@map("meeting_participants")
 }
+
+
+model WorkspaceMemberCache {
+  workspaceId String
+  userId      String
+  role        String
+  updatedAt   DateTime @updatedAt
+
+  @@id([workspaceId, userId])
+  @@index([workspaceId])
+  @@map("workspace_member_cache")
+}
+
+model ProjectWorkspaceCache {
+  projectId   String   @id
+  workspaceId String
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@map("project_workspace_cache")
+}

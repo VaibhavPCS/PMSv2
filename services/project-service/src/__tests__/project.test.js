@@ -53,6 +53,21 @@ const mockPrisma = {
   projectDateHistory: {
     create: jest.fn(),
   },
+  projectOpenWorkCache: {
+    findUnique: jest.fn().mockResolvedValue(null),
+    upsert: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  openTaskRef: {
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    delete: jest.fn(),
+  },
+  openSprintRef: {
+    findUnique: jest.fn(),
+    create: jest.fn(),
+    delete: jest.fn(),
+  },
 };
 
 jest.mock("../config/prisma", () => mockPrisma);
@@ -172,6 +187,12 @@ describe('POST /api/v1/projects — CreateProject', () => {
     const res = await request(app).post('/api/v1/projects').send(body);
     expect(res.status).toBe(422);
   });
+
+  it('422 — missing endDate is rejected', async () => {
+    const { endDate, ...body } = validBody;
+    const res = await request(app).post('/api/v1/projects').send(body);
+    expect(res.status).toBe(422);
+  });
 });
 
 // ─── GET /api/v1/projects ─────────────────────────────────────────────────────
@@ -213,6 +234,102 @@ describe('GET /api/v1/projects — GetProjects', () => {
     expect(res.status).toBe(200);
     expect(res.body.page).toBe(2);
     expect(res.body.limit).toBe(5);
+  });
+});
+
+// ─── GET /api/v1/projects/recent ──────────────────────────────────────────────
+
+describe('GET /api/v1/projects/recent — GetRecentProjects', () => {
+  it('200 — returns { projects: [...] } mapped to the dashboard shape', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([
+      makeProject({ state: 'In Progress', members: [{ role: 'project_head' }] }),
+    ]);
+
+    const res = await request(app)
+      .get('/api/v1/projects/recent')
+      .query({ limit: 25, sortBy: 'startDate' })
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.projects)).toBe(true);
+    const p = res.body.projects[0];
+    expect(p._id).toBe(PROJECT_ID);
+    expect(p.title).toBe('My Project');
+    expect(p.status).toBe('In Progress');
+    expect(p.startDate).toBeDefined();
+    expect(p.endDate).toBeDefined();
+    // Must NOT leak raw prisma keys
+    expect(p.id).toBeUndefined();
+    expect(p.name).toBeUndefined();
+  });
+
+  it('200 — resolves workspaceId from the workspace-id header (no query param)', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/v1/projects/recent')
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(200);
+    expect(res.body.projects).toEqual([]);
+    expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ workspaceId: WORKSPACE_ID }) })
+    );
+  });
+
+  it('200 — accepts the dashboard limit=1000 (above the normal pagination cap)', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/v1/projects/recent')
+      .query({ limit: 1000, sortBy: 'startDate' })
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 1000 })
+    );
+  });
+
+  it('200 — defaults sort to startDate desc when sortBy omitted', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .get('/api/v1/projects/recent')
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(200);
+    expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { startDate: 'desc' } })
+    );
+  });
+
+  it('400 — missing workspace-id header and query param is rejected', async () => {
+    const res = await request(app).get('/api/v1/projects/recent');
+    expect(res.status).toBe(400);
+  });
+
+  it('422 — invalid sortBy value is rejected by the validator', async () => {
+    const res = await request(app)
+      .get('/api/v1/projects/recent')
+      .query({ sortBy: 'nonsense' })
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(422);
+  });
+
+  it('200 — recent is matched before :id (route ordering)', async () => {
+    mockPrisma.project.findMany.mockResolvedValue([]);
+    // If ':id' captured "recent", findUnique (GetProject) would run instead.
+    mockPrisma.project.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get('/api/v1/projects/recent')
+      .set('workspace-id', WORKSPACE_ID);
+
+    expect(res.status).toBe(200);
+    expect(res.body.projects).toBeDefined();
+    expect(mockPrisma.project.findMany).toHaveBeenCalled();
   });
 });
 
@@ -282,6 +399,38 @@ describe('PATCH /api/v1/projects/:id — UpdateProject', () => {
       .send({ projectStatus: 'at_risk' });
 
     expect(res.status).toBe(200);
+  });
+
+  it('400 — cannot complete project with open tasks or active sprints remaining', async () => {
+    mockPrisma.projectMember.findFirst.mockResolvedValue(
+      makeProjectMember({ role: 'project_head' })
+    );
+    mockPrisma.projectOpenWorkCache.findUnique.mockResolvedValueOnce({
+      projectId: PROJECT_ID,
+      openTasks: 3,
+      activeSprints: 1,
+    });
+
+    const res = await request(app)
+      .patch(`/api/v1/projects/${PROJECT_ID}`)
+      .send({ projectStatus: 'completed' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('200 — completes project when no open work remains (missing cache row treated as zero)', async () => {
+    mockPrisma.projectMember.findFirst.mockResolvedValue(
+      makeProjectMember({ role: 'project_head' })
+    );
+    mockPrisma.projectOpenWorkCache.findUnique.mockResolvedValueOnce(null);
+    mockPrisma.project.update.mockResolvedValue(makeProject({ projectStatus: 'completed' }));
+
+    const res = await request(app)
+      .patch(`/api/v1/projects/${PROJECT_ID}`)
+      .send({ projectStatus: 'completed' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.projectStatus).toBe('completed');
   });
 
   it('403 — non-project-head cannot update', async () => {
@@ -477,6 +626,45 @@ describe('POST /api/v1/projects/:id/members — AddMember', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.userId).toBe(NEW_USER);
+  });
+
+  it('201 — project head adds a member reporting to the project head', async () => {
+    mockPrisma.projectMember.findFirst
+      .mockResolvedValueOnce(makeProjectMember({ role: 'project_head' }))               // _requireProjectHead
+      .mockResolvedValueOnce(makeProjectMember({ userId: USER_ID, role: 'project_head' })); // _validateReportsTo manager lookup
+    mockPrisma.projectMember.upsert.mockResolvedValue(
+      makeProjectMember({ userId: NEW_USER, role: 'member', reportsTo: USER_ID })
+    );
+
+    const res = await request(app)
+      .post(`/api/v1/projects/${PROJECT_ID}/members`)
+      .send({ userId: NEW_USER, role: 'member', reportsTo: USER_ID });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('400 — reportsTo must be the project head or an active team lead', async () => {
+    mockPrisma.projectMember.findFirst
+      .mockResolvedValueOnce(makeProjectMember({ role: 'project_head' })) // _requireProjectHead
+      .mockResolvedValueOnce(makeProjectMember({ userId: OTHER_USER, role: 'member' })); // manager is a plain member
+
+    const res = await request(app)
+      .post(`/api/v1/projects/${PROJECT_ID}/members`)
+      .send({ userId: NEW_USER, role: 'member', reportsTo: OTHER_USER });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('400 — a member cannot report to themselves', async () => {
+    mockPrisma.projectMember.findFirst.mockResolvedValueOnce(
+      makeProjectMember({ role: 'project_head' })
+    );
+
+    const res = await request(app)
+      .post(`/api/v1/projects/${PROJECT_ID}/members`)
+      .send({ userId: NEW_USER, role: 'member', reportsTo: NEW_USER });
+
+    expect(res.status).toBe(400);
   });
 
   it('201 — project head adds a trainee', async () => {

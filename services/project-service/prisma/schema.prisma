@@ -44,6 +44,7 @@ model ProjectMember {
   @@unique([projectId, userId])
   @@index([userId])
   @@index([projectId])
+  reportsTo String?
 }
 
 // Tracks every project end-date extension — shown in project overview
@@ -74,4 +75,33 @@ model WorkspaceRoleCache {
   @@unique([userId, workspaceId])
   @@index([userId])
   @@index([workspaceId])
+}
+
+// Local read model — populated via TASK_EVENTS / SPRINT_EVENTS (Kafka).
+// Used by UpdateProject to block transition to COMPLETED while a project
+// still has open tasks or active/planning sprints. A missing row == zero.
+model ProjectOpenWorkCache {
+  projectId     String   @id
+  openTasks     Int      @default(0)
+  activeSprints Int      @default(0)
+  updatedAt     DateTime @updatedAt
+}
+
+// Tracks which project an OPEN task belongs to. TASK_DELETED / TASK_STATUS_CHANGED
+// payloads either omit projectId (delete) or may be redelivered, so this ref makes
+// openTasks decrements project-accurate and idempotent (decrement only if ref exists).
+model OpenTaskRef {
+  taskId    String @id
+  projectId String
+
+  @@index([projectId])
+}
+
+// Tracks which project an ACTIVE sprint belongs to. SPRINT_DELETED carries only
+// sprintId (no projectId), so this ref lets us resolve the project on delete.
+model OpenSprintRef {
+  sprintId  String @id
+  projectId String
+
+  @@index([projectId])
 }

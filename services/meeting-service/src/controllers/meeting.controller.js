@@ -9,8 +9,14 @@ const CreateMeeting = CatchAsync(async (req, res) => {
 
 const GetMeetings = CatchAsync(async (req, res) => {
     const userId = req.session.getUserId();
-    const { workspaceId, from, to, page, limit } = req.query;
-    const meetings = await MeetingService.GetMeetings(workspaceId, userId, from, to, { page, limit });
+    const { from, to, page, limit } = req.query;
+    // The frontend sends the active workspace via the 'workspace-id' header and
+    // the meetings list page sends no time window — default to ±1 year.
+    const workspaceId = req.query.workspaceId || req.headers['workspace-id'];
+    const now = Date.now();
+    const fromDate = from || new Date(now - 365 * 24 * 60 * 60 * 1000).toISOString();
+    const toDate   = to   || new Date(now + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const meetings = await MeetingService.GetMeetings(workspaceId, userId, fromDate, toDate, { page, limit });
     res.status(200).json({ status: 'success', data: meetings });
 });
 

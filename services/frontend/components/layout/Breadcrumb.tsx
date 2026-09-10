@@ -1,0 +1,208 @@
+'use client';
+
+import React from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
+
+interface BreadcrumbItem {
+  label: string;
+  icon?: React.ReactNode;
+  href?: string;
+  isActive?: boolean;
+}
+
+interface BreadcrumbProps {
+  items?: BreadcrumbItem[];
+}
+
+export function Breadcrumb({ items }: BreadcrumbProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleBack = () => {
+    router.back();
+  };
+
+  // Auto-detect breadcrumb items based on current route if not provided
+  const getBreadcrumbItems = (): BreadcrumbItem[] => {
+    if (items) return items;
+
+    const path = pathname;
+    const breadcrumbs: BreadcrumbItem[] = [
+      {
+        label: 'Dashboard',
+        icon: (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/assets/4001ba5860d2858f2469e275a4ce7fe2c2c2a952.svg"
+            alt="Dashboard"
+            className="w-[20px] h-[20px]"
+          />
+        ),
+        href: '/dashboard',
+        isActive: path === '/dashboard'
+      }
+    ];
+
+    if (path.includes('/workspace')) {
+      breadcrumbs.push({
+        label: 'Workspace',
+        icon: (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg"
+            alt="Workspace"
+            className="w-[20px] h-[20px]"
+          />
+        ),
+        href: '/workspace',
+        isActive: path === '/workspace'
+      });
+    }
+
+    if (path.includes('/project/')) {
+      // Add workspace if not already added
+      if (!breadcrumbs.find(b => b.label === 'Workspace')) {
+        breadcrumbs.push({
+          label: 'Workspace',
+          icon: (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg"
+              alt="Workspace"
+              className="w-[20px] h-[20px]"
+            />
+          ),
+          href: '/workspace',
+          isActive: false
+        });
+      }
+      breadcrumbs.push({
+        label: 'Project Detail',
+        icon: (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/assets/folder-project-icon.svg"
+            alt="Project"
+            className="w-[20px] h-[20px]"
+          />
+        ),
+        isActive: !path.includes('/task/')
+      });
+    }
+
+    if (path.includes('/task/')) {
+      // Add workspace and project if not already added
+      if (!breadcrumbs.find(b => b.label === 'Workspace')) {
+        breadcrumbs.push({
+          label: 'Workspace',
+          icon: (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/assets/84789fe1294f4eedc3013b31bb79e7394bd87fab.svg"
+              alt="Workspace"
+              className="w-[20px] h-[20px]"
+            />
+          ),
+          href: '/workspace',
+          isActive: false
+        });
+      }
+      if (!breadcrumbs.find(b => b.label === 'Project Detail')) {
+        breadcrumbs.push({
+          label: 'Project Detail',
+          icon: (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/assets/folder-project-icon.svg"
+              alt="Project"
+              className="w-[20px] h-[20px]"
+            />
+          ),
+          isActive: false
+        });
+      }
+      breadcrumbs.push({
+        label: 'Task Details',
+        icon: (
+          <svg
+            className="w-[20px] h-[20px]"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M6 10L9 13L14 7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <rect
+              x="3"
+              y="3"
+              width="14"
+              height="14"
+              rx="2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+            />
+          </svg>
+        ),
+        isActive: true
+      });
+    }
+
+    return breadcrumbs;
+  };
+
+  const breadcrumbItems = getBreadcrumbItems();
+
+  return (
+    <div className="flex items-center text-[12px] md:text-[14px] text-[#717182] font-['Inter'] gap-[8px] md:gap-[10px]">
+      {/* Back Button */}
+      <button
+        onClick={handleBack}
+        className="flex items-center gap-[6px] md:gap-[8px] bg-transparent border-none cursor-pointer text-[#717182] text-[12px] md:text-[14px] font-['Inter'] hover:text-[#040110] transition-colors p-0"
+      >
+        <ArrowLeft size={14} strokeWidth={2} className="md:w-4 md:h-4" />
+        <span className="hidden md:inline font-medium">Back</span>
+      </button>
+
+      {/* Separator */}
+      <span className="text-[#949291] text-[14px] md:text-[16px]">/</span>
+
+      {/* Breadcrumb Items */}
+      {breadcrumbItems.map((item, index) => (
+        <React.Fragment key={index}>
+          {item.href && !item.isActive ? (
+            <a
+              href={item.href}
+              onClick={(e) => {
+                e.preventDefault();
+                router.push(item.href!);
+              }}
+              className="flex items-center gap-[6px] md:gap-[8px] text-[#717182] hover:text-[#040110] transition-colors no-underline"
+            >
+              <span className="w-[16px] h-[16px] md:w-[20px] md:h-[20px] flex items-center">{item.icon}</span>
+              <span className="hidden md:inline">{item.label}</span>
+            </a>
+          ) : (
+            <div className={`flex items-center gap-[6px] md:gap-[8px] ${item.isActive ? 'text-[#040110]' : 'text-[#717182]'}`}>
+              <span className="w-[16px] h-[16px] md:w-[20px] md:h-[20px] flex items-center">{item.icon}</span>
+              <span className="hidden md:inline">{item.label}</span>
+            </div>
+          )}
+
+          {/* Separator between items (except last) */}
+          {index < breadcrumbItems.length - 1 && (
+            <span className="text-[#949291] text-[14px] md:text-[16px]">/</span>
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+export default Breadcrumb;

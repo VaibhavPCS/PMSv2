@@ -74,6 +74,7 @@ jest.mock('../config/prisma', () => ({
     findUnique: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
 }));
 
@@ -412,6 +413,60 @@ describe('Chat Controller', () => {
       await request(App)
         .patch(`${BASE}/nonexistent/archive`)
         .expect(404);
+    });
+  });
+
+  describe('GET /api/v1/chats/unread/count', () => {
+    it('returns the unread message count for the authenticated user', async () => {
+      prisma.message.count.mockResolvedValue(7);
+
+      const res = await request(App)
+        .get(`${BASE}/unread/count`)
+        .expect(200);
+
+      expect(res.body.status).toBe('success');
+      // Top-level `count` is what the frontend BadgeProvider reads.
+      expect(res.body.count).toBe(7);
+      expect(res.body.data.count).toBe(7);
+    });
+
+    it('returns 0 when there are no unread messages', async () => {
+      prisma.message.count.mockResolvedValue(0);
+
+      const res = await request(App)
+        .get(`${BASE}/unread/count`)
+        .expect(200);
+
+      expect(res.body.count).toBe(0);
+      expect(res.body.data.count).toBe(0);
+    });
+
+    it('excludes deleted messages and the user\'s own messages, and only counts unread in active chats', async () => {
+      prisma.message.count.mockResolvedValue(3);
+
+      await request(App)
+        .get(`${BASE}/unread/count`)
+        .expect(200);
+
+      expect(prisma.message.count).toHaveBeenCalledWith({
+        where: {
+          isDeleted: false,
+          senderId: { not: USER_ID },
+          chat: { participants: { some: { userId: USER_ID, isActive: true } } },
+          reads: { none: { userId: USER_ID } },
+        },
+      });
+    });
+
+    it('does not collide with GET /:id (route ordering)', async () => {
+      prisma.message.count.mockResolvedValue(2);
+
+      await request(App)
+        .get(`${BASE}/unread/count`)
+        .expect(200);
+
+      // The /:id handler (chat.findUnique) must NOT have been invoked.
+      expect(prisma.chat.findUnique).not.toHaveBeenCalled();
     });
   });
 });

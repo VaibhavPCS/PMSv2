@@ -8,6 +8,22 @@ const {
   PublishProjectHeadChanged,
 } = require('../events/publishers');
 
+const _validateReportsTo = async (projectId, memberUserId, reportsTo) => {
+  if (reportsTo === undefined) {
+    return undefined;
+  }
+  if (reportsTo === memberUserId) {
+    throw new APIError(400, 'A member cannot report to themselves');
+  }
+  const manager = await prisma.projectMember.findFirst({
+    where: { projectId, userId: reportsTo, isActive: true },
+  });
+  if (!manager || ![ROLES.PROJECT_HEAD, 'tl'].includes(manager.role)) {
+    throw new APIError(400, 'reportsTo must be the project head or an active team lead');
+  }
+  return reportsTo;
+};
+
 const _requireProjectHead = async (projectId, requesterId) => {
   const member = await prisma.projectMember.findFirst({
     where: { projectId, userId: requesterId, isActive: true },
@@ -34,15 +50,16 @@ const GetMembers = async (projectId, requesterId) => {
   });
 };
 
-const AddMember = async (projectId, newUserId, role, requesterId) => {
+const AddMember = async (projectId, newUserId, role, requesterId, reportsTo) => {
   await _requireProjectHead(projectId, requesterId);
   if (!['tl', 'trainee', ROLES.MEMBER].includes(role)) {
     throw new APIError(400, 'Invalid role');
   }
+  const resolvedReportsTo = await _validateReportsTo(projectId, newUserId, reportsTo);
   const member = await prisma.projectMember.upsert({
     where: { projectId_userId: { projectId, userId: newUserId } },
-    update: { isActive: true, role },
-    create: { projectId, userId: newUserId, role, isActive: true },
+    update: { isActive: true, role, ...(resolvedReportsTo !== undefined && { reportsTo: resolvedReportsTo }) },
+    create: { projectId, userId: newUserId, role, isActive: true, ...(resolvedReportsTo !== undefined && { reportsTo: resolvedReportsTo }) },
   });
   await PublishProjectMemberAdded(projectId, newUserId, role);
   return member;
@@ -74,7 +91,7 @@ const RemoveMember = async (projectId, targetUserId, requesterId) => {
   await PublishProjectMemberRemoved(projectId, targetUserId);
 };
 
-const ChangeMemberRole = async (projectId, targetUserId, newRole, requesterId) => {
+const ChangeMemberRole = async (projectId, targetUserId, newRole, requesterId, reportsTo) => {
   await _requireProjectHead(projectId, requesterId);
   if (!['tl', 'trainee', ROLES.MEMBER].includes(newRole)) {
     throw new APIError(400, 'Invalid role');
@@ -88,9 +105,10 @@ const ChangeMemberRole = async (projectId, targetUserId, newRole, requesterId) =
   if (targetMember.role === ROLES.PROJECT_HEAD) {
     throw new APIError(403, 'Use ChangeProjectHead to change project head role');
   }
+  const resolvedReportsTo = await _validateReportsTo(projectId, targetUserId, reportsTo);
   const updated = await prisma.projectMember.update({
     where: { projectId_userId: { projectId, userId: targetUserId } },
-    data: { role: newRole },
+    data: { role: newRole, ...(resolvedReportsTo !== undefined && { reportsTo: resolvedReportsTo }) },
   });
   await PublishProjectMemberRoleChanged(projectId, targetUserId, newRole);
   return updated;
